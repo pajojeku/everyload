@@ -1,0 +1,2 @@
+[2025-11-14 21:12:08] Starting download for URL: https://www.cda.pl/video/191861681/vfilm
+[2025-11-14 21:12:10] Exception during yt_dlp: [0;31mERROR:[0m [CDA] 191861681: No video formats found!; please report this issue on  https://github.com/yt-dlp/yt-dlp/issues?q= , filling out the appropriate issue template. Confirm you are on the latest version using  yt-dlp -U

@@ -1,0 +1,24 @@
+[2025-11-18 16:18:16] Starting download for URL: https://youtube.com/shorts/348rJUD6_Bo?si=J1zr-kPxjPej655A
+[2025-11-18 16:18:46] downloading: /home/pajojeku/AndroidStudioProjects/Everyload/yt_dlp_server/downloads/Tom Pearl 💛🤎.f247.webm 0.2% downloaded=1024 speed=None
+[2025-11-18 16:18:46] downloading: /home/pajojeku/AndroidStudioProjects/Everyload/yt_dlp_server/downloads/Tom Pearl 💛🤎.f247.webm 0.5% downloaded=3072 speed=2595146.4024169184
+[2025-11-18 16:18:46] downloading: /home/pajojeku/AndroidStudioProjects/Everyload/yt_dlp_server/downloads/Tom Pearl 💛🤎.f247.webm 1.2% downloaded=7168 speed=4044225.3258003765
+[2025-11-18 16:18:46] downloading: /home/pajojeku/AndroidStudioProjects/Everyload/yt_dlp_server/downloads/Tom Pearl 💛🤎.f247.webm 2.6% downloaded=15360 speed=6839845.996390275
+[2025-11-18 16:18:46] downloading: /home/pajojeku/AndroidStudioProjects/Everyload/yt_dlp_server/downloads/Tom Pearl 💛🤎.f247.webm 5.4% downloaded=31744 speed=11375938.668489406
+[2025-11-18 16:18:46] downloading: /home/pajojeku/AndroidStudioProjects/Everyload/yt_dlp_server/downloads/Tom Pearl 💛🤎.f247.webm 10.9% downloaded=64512 speed=882864.4317890388
+[2025-11-18 16:18:47] downloading: /home/pajojeku/AndroidStudioProjects/Everyload/yt_dlp_server/downloads/Tom Pearl 💛🤎.f247.webm 22.0% downloaded=130048 speed=486516.89248319814
+[2025-11-18 16:18:47] downloading: /home/pajojeku/AndroidStudioProjects/Everyload/yt_dlp_server/downloads/Tom Pearl 💛🤎.f247.webm 44.2% downloaded=261120 speed=748056.9124406966
+[2025-11-18 16:18:47] downloading: /home/pajojeku/AndroidStudioProjects/Everyload/yt_dlp_server/downloads/Tom Pearl 💛🤎.f247.webm 88.6% downloaded=523264 speed=1313990.6065017958
+[2025-11-18 16:18:48] downloading: /home/pajojeku/AndroidStudioProjects/Everyload/yt_dlp_server/downloads/Tom Pearl 💛🤎.f247.webm 100.0% downloaded=590708 speed=326894.62927253277
+[2025-11-18 16:18:48] finished: /home/pajojeku/AndroidStudioProjects/Everyload/yt_dlp_server/downloads/Tom Pearl 💛🤎.f247.webm
+[2025-11-18 16:18:53] downloading: /home/pajojeku/AndroidStudioProjects/Everyload/yt_dlp_server/downloads/Tom Pearl 💛🤎.f251.webm 0.7% downloaded=1024 speed=None
+[2025-11-18 16:18:53] downloading: /home/pajojeku/AndroidStudioProjects/Everyload/yt_dlp_server/downloads/Tom Pearl 💛🤎.f251.webm 2.0% downloaded=3072 speed=2282937.9673990076
+[2025-11-18 16:18:53] downloading: /home/pajojeku/AndroidStudioProjects/Everyload/yt_dlp_server/downloads/Tom Pearl 💛🤎.f251.webm 4.7% downloaded=7168 speed=3786018.2687318977
+[2025-11-18 16:18:53] downloading: /home/pajojeku/AndroidStudioProjects/Everyload/yt_dlp_server/downloads/Tom Pearl 💛🤎.f251.webm 10.1% downloaded=15360 speed=6404663.42976439
+[2025-11-18 16:18:53] downloading: /home/pajojeku/AndroidStudioProjects/Everyload/yt_dlp_server/downloads/Tom Pearl 💛🤎.f251.webm 20.9% downloaded=31744 speed=10612465.022796111
+[2025-11-18 16:18:53] downloading: /home/pajojeku/AndroidStudioProjects/Everyload/yt_dlp_server/downloads/Tom Pearl 💛🤎.f251.webm 42.5% downloaded=64512 speed=18437104.091578085
+[2025-11-18 16:18:53] downloading: /home/pajojeku/AndroidStudioProjects/Everyload/yt_dlp_server/downloads/Tom Pearl 💛🤎.f251.webm 85.6% downloaded=130048 speed=271635.59602621634
+[2025-11-18 16:18:53] downloading: /home/pajojeku/AndroidStudioProjects/Everyload/yt_dlp_server/downloads/Tom Pearl 💛🤎.f251.webm 100.0% downloaded=151959 speed=313424.0590259576
+[2025-11-18 16:18:53] finished: /home/pajojeku/AndroidStudioProjects/Everyload/yt_dlp_server/downloads/Tom Pearl 💛🤎.f251.webm
+[2025-11-18 16:18:53] Renamed: Tom Pearl 💛🤎.webm -> Tom_Pearl.webm
+[2025-11-18 16:18:53] yt_dlp finished extraction
+[2025-11-18 16:18:53] Job 1c8629e9-91c1-4750-8dea-bef8e8d2cf62 finished, files: ['Tom_Pearl.webm']
