@@ -1,0 +1,26 @@
+[2025-11-18 16:21:16] Starting download for URL: https://youtube.com/shorts/re_knLTFf0w?si=hBUgItU2b5noY0gZ
+[2025-11-18 16:21:24] downloading: /home/pajojeku/AndroidStudioProjects/Everyload/yt_dlp_server/downloads/top 5 funny cat moments!!!😂😂😂.f398.mp4 0.1% downloaded=1024 speed=None
+[2025-11-18 16:21:24] downloading: /home/pajojeku/AndroidStudioProjects/Everyload/yt_dlp_server/downloads/top 5 funny cat moments!!!😂😂😂.f398.mp4 0.2% downloaded=3072 speed=2809616.634976014
+[2025-11-18 16:21:24] downloading: /home/pajojeku/AndroidStudioProjects/Everyload/yt_dlp_server/downloads/top 5 funny cat moments!!!😂😂😂.f398.mp4 0.4% downloaded=7168 speed=5232295.696484511
+[2025-11-18 16:21:24] downloading: /home/pajojeku/AndroidStudioProjects/Everyload/yt_dlp_server/downloads/top 5 funny cat moments!!!😂😂😂.f398.mp4 0.8% downloaded=15360 speed=9658846.992503747
+[2025-11-18 16:21:24] downloading: /home/pajojeku/AndroidStudioProjects/Everyload/yt_dlp_server/downloads/top 5 funny cat moments!!!😂😂😂.f398.mp4 1.6% downloaded=31744 speed=5710657.781514047
+[2025-11-18 16:21:24] downloading: /home/pajojeku/AndroidStudioProjects/Everyload/yt_dlp_server/downloads/top 5 funny cat moments!!!😂😂😂.f398.mp4 3.3% downloaded=64512 speed=1792319.827036193
+[2025-11-18 16:21:24] downloading: /home/pajojeku/AndroidStudioProjects/Everyload/yt_dlp_server/downloads/top 5 funny cat moments!!!😂😂😂.f398.mp4 6.7% downloaded=130048 speed=2633219.3071167194
+[2025-11-18 16:21:24] downloading: /home/pajojeku/AndroidStudioProjects/Everyload/yt_dlp_server/downloads/top 5 funny cat moments!!!😂😂😂.f398.mp4 13.5% downloaded=261120 speed=2267322.7707620836
+[2025-11-18 16:21:24] downloading: /home/pajojeku/AndroidStudioProjects/Everyload/yt_dlp_server/downloads/top 5 funny cat moments!!!😂😂😂.f398.mp4 27.0% downloaded=523264 speed=2096745.2843720114
+[2025-11-18 16:21:24] downloading: /home/pajojeku/AndroidStudioProjects/Everyload/yt_dlp_server/downloads/top 5 funny cat moments!!!😂😂😂.f398.mp4 54.1% downloaded=1047552 speed=2275805.249569572
+[2025-11-18 16:21:24] downloading: /home/pajojeku/AndroidStudioProjects/Everyload/yt_dlp_server/downloads/top 5 funny cat moments!!!😂😂😂.f398.mp4 100.0% downloaded=1935930 speed=2969799.013558505
+[2025-11-18 16:21:24] finished: /home/pajojeku/AndroidStudioProjects/Everyload/yt_dlp_server/downloads/top 5 funny cat moments!!!😂😂😂.f398.mp4
+[2025-11-18 16:21:25] downloading: /home/pajojeku/AndroidStudioProjects/Everyload/yt_dlp_server/downloads/top 5 funny cat moments!!!😂😂😂.f251.webm 0.3% downloaded=1024 speed=499298.685887003
+[2025-11-18 16:21:25] downloading: /home/pajojeku/AndroidStudioProjects/Everyload/yt_dlp_server/downloads/top 5 funny cat moments!!!😂😂😂.f251.webm 1.0% downloaded=3072 speed=1139550.8877686388
+[2025-11-18 16:21:25] downloading: /home/pajojeku/AndroidStudioProjects/Everyload/yt_dlp_server/downloads/top 5 funny cat moments!!!😂😂😂.f251.webm 2.3% downloaded=7168 speed=2340399.4295500545
+[2025-11-18 16:21:25] downloading: /home/pajojeku/AndroidStudioProjects/Everyload/yt_dlp_server/downloads/top 5 funny cat moments!!!😂😂😂.f251.webm 4.9% downloaded=15360 speed=4313659.821894878
+[2025-11-18 16:21:25] downloading: /home/pajojeku/AndroidStudioProjects/Everyload/yt_dlp_server/downloads/top 5 funny cat moments!!!😂😂😂.f251.webm 10.2% downloaded=31744 speed=5391754.522394104
+[2025-11-18 16:21:25] downloading: /home/pajojeku/AndroidStudioProjects/Everyload/yt_dlp_server/downloads/top 5 funny cat moments!!!😂😂😂.f251.webm 20.7% downloaded=64512 speed=3599900.7456761217
+[2025-11-18 16:21:25] downloading: /home/pajojeku/AndroidStudioProjects/Everyload/yt_dlp_server/downloads/top 5 funny cat moments!!!😂😂😂.f251.webm 41.8% downloaded=130048 speed=921948.7670555862
+[2025-11-18 16:21:25] downloading: /home/pajojeku/AndroidStudioProjects/Everyload/yt_dlp_server/downloads/top 5 funny cat moments!!!😂😂😂.f251.webm 83.9% downloaded=261120 speed=1075986.6274737886
+[2025-11-18 16:21:25] downloading: /home/pajojeku/AndroidStudioProjects/Everyload/yt_dlp_server/downloads/top 5 funny cat moments!!!😂😂😂.f251.webm 100.0% downloaded=311168 speed=1047084.4578557417
+[2025-11-18 16:21:25] finished: /home/pajojeku/AndroidStudioProjects/Everyload/yt_dlp_server/downloads/top 5 funny cat moments!!!😂😂😂.f251.webm
+[2025-11-18 16:21:25] Renamed: top 5 funny cat moments!!!😂😂😂.webm -> top_5_funny_cat_moments.webm
+[2025-11-18 16:21:25] yt_dlp finished extraction
+[2025-11-18 16:21:25] Job a2dd1e5b-5f8a-41d8-86f3-2c3a0957500f finished, files: ['top_5_funny_cat_moments.webm']
