@@ -35,13 +35,8 @@ android {
     }
 }
 
-<<<<<<< HEAD
-
-
 val youtubedlAndroid = "0.18.1"
 
-=======
->>>>>>> f2f983204c9fe7864fff29f98d63e6226a0f3b0d
 dependencies {
 
     implementation(libs.androidx.core.ktx)
@@ -56,11 +51,8 @@ dependencies {
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
-<<<<<<< HEAD
 
     implementation("io.github.junkfood02.youtubedl-android:library:${youtubedlAndroid}")
     implementation("io.github.junkfood02.youtubedl-android:ffmpeg:${youtubedlAndroid}")
     implementation("io.github.junkfood02.youtubedl-android:aria2c:${youtubedlAndroid}")
-=======
->>>>>>> f2f983204c9fe7864fff29f98d63e6226a0f3b0d
 }

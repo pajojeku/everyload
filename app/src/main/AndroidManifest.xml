@@ -2,7 +2,6 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools">
 
-<<<<<<< HEAD
     <!-- Allow network access for yt-dlp downloads -->
     <uses-permission android:name="android.permission.INTERNET" />
     <!-- Storage permissions for downloading files -->
@@ -14,13 +13,6 @@
     <uses-permission android:name="android.permission.READ_MEDIA_VIDEO" />
     <uses-permission android:name="android.permission.READ_MEDIA_AUDIO" />
 
-
-
-=======
-    <!-- Allow network access to contact yt-dlp server -->
-    <uses-permission android:name="android.permission.INTERNET" />
->>>>>>> f2f983204c9fe7864fff29f98d63e6226a0f3b0d
-
     <application
         android:allowBackup="true"
         android:dataExtractionRules="@xml/data_extraction_rules"
@@ -30,15 +22,9 @@
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
         android:theme="@style/Theme.Everyload"
-<<<<<<< HEAD
         android:networkSecurityConfig="@xml/network_security_config"
+        android:extractNativeLibs="true">
 
-        android:extractNativeLibs="true"
-        >
-
-=======
-        android:networkSecurityConfig="@xml/network_security_config">
->>>>>>> f2f983204c9fe7864fff29f98d63e6226a0f3b0d
         <activity
             android:name=".MainActivity"
             android:exported="true">
