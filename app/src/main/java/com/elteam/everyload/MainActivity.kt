@@ -28,87 +28,199 @@ import androidx.core.content.ContextCompat
 import android.content.pm.PackageManager
 import android.os.Build
 import android.Manifest
+import android.widget.EditText
+import android.widget.Button
+import android.content.SharedPreferences
+import android.view.Menu
+import android.view.MenuItem
+import android.widget.LinearLayout
+import android.widget.ArrayAdapter
+import android.widget.Spinner
+import android.widget.Switch
+import android.widget.SeekBar
+import android.widget.TextView
+import androidx.appcompat.widget.Toolbar
+
+// Service imports
+import com.elteam.everyload.service.DownloadService
+import android.content.ComponentName
+import android.content.ServiceConnection
+import android.os.IBinder
 
 // YTDLP imports
 import com.yausername.youtubedl_android.YoutubeDL
 import com.yausername.youtubedl_android.YoutubeDLRequest
 import com.yausername.youtubedl_android.YoutubeDLException
 
-class MainActivity : AppCompatActivity() {
+class MainActivity : AppCompatActivity(), DownloadService.DownloadServiceCallbacks {
 
     private val jobs = mutableListOf<JobEntry>()
     private lateinit var adapter: JobAdapter
+    private lateinit var settings: SharedPreferences
+    
+    // Concurrent download management
+    private var activeDownloadCount = 0
+    private val downloadQueue = mutableListOf<JobEntry>()
+    
+    // Service binding
+    private var downloadService: DownloadService? = null
+    private var serviceBound = false
+    
+    private val serviceConnection = object : ServiceConnection {
+        override fun onServiceConnected(className: ComponentName, service: IBinder) {
+            val binder = service as DownloadService.LocalBinder
+            downloadService = binder.getService()
+            downloadService?.setCallbacks(this@MainActivity)
+            serviceBound = true
+        }
+        
+        override fun onServiceDisconnected(arg0: ComponentName) {
+            downloadService = null
+            serviceBound = false
+        }
+    }
     
     companion object {
         private const val PREFS_NAME = "everyload_prefs"
         private const val KEY_JOBS = "jobs_json"
         private const val PERMISSION_REQUEST_CODE = 100
+        private const val NOTIFICATION_PERMISSION_REQUEST_CODE = 101
+        
+        // Settings keys
+        private const val KEY_FORMAT = "download_format" // mp3, mp4, best
+        private const val KEY_QUALITY = "download_quality" // 720p, 1080p, best
+        private const val KEY_MAX_ATTEMPTS = "max_attempts"
+        private const val KEY_ALLOW_PLAYLISTS = "allow_playlists"
+        private const val KEY_MAX_CONCURRENT_DOWNLOADS = "max_concurrent_downloads"
     }
+    
+    private fun getDownloadFormat(): String = settings.getString(KEY_FORMAT, "best") ?: "best"
+    private fun getDownloadQuality(): String = settings.getString(KEY_QUALITY, "720p") ?: "720p"
+    private fun getMaxAttempts(): Int = settings.getInt(KEY_MAX_ATTEMPTS, 3)
+    private fun getAllowPlaylists(): Boolean = settings.getBoolean(KEY_ALLOW_PLAYLISTS, false)
+    private fun getMaxConcurrentDownloads(): Int = settings.getInt(KEY_MAX_CONCURRENT_DOWNLOADS, 3)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         setContentView(R.layout.activity_main)
+        
+        // Store the original intent before it can be modified
+        val originalIntent = intent
+        
+        Log.d("MainActivity", "onCreate called")
+        Log.d("MainActivity", "Intent: ${originalIntent}")
+        Log.d("MainActivity", "Intent action: ${originalIntent?.action}")
+        Log.d("MainActivity", "Intent type: ${originalIntent?.type}")
+        Log.d("MainActivity", "Intent data: ${originalIntent?.data}")
+        
+        // Set up toolbar
+        val toolbar = findViewById<Toolbar>(R.id.toolbar)
+        setSupportActionBar(toolbar)
+        
+        // Bind to download service
+        val intent = Intent(this, DownloadService::class.java)
+        bindService(intent, serviceConnection, Context.BIND_AUTO_CREATE)
+        
         ViewCompat.setOnApplyWindowInsetsListener(findViewById(R.id.main)) { v, insets ->
             val systemBars = insets.getInsets(WindowInsetsCompat.Type.systemBars())
             v.setPadding(systemBars.left, systemBars.top, systemBars.right, systemBars.bottom)
             insets
         }
 
-        // Initialize YTDLP
+        settings = getSharedPreferences("app_settings", MODE_PRIVATE)
+        
+        // Initialize YoutubeDL
         try {
             YoutubeDL.getInstance().init(this)
         } catch (e: YoutubeDLException) {
-            Log.e("YouTubeDL", "Failed to initialize youtubedl-android", e)
+            e.printStackTrace()
+            showErrorDialog("Failed to initialize YoutubeDL: ${e.message}")
         }
 
-        // Check and request permissions
-        checkPermissions()
+        val recyclerView: RecyclerView = findViewById(R.id.jobsRecycler)
+        recyclerView.layoutManager = LinearLayoutManager(this)
 
-        // Load saved jobs from SharedPreferences
-        loadJobs()
+        adapter = JobAdapter(jobs, { job -> handleJobClick(job) }) { saveJobsToPrefs() }
+        recyclerView.adapter = adapter
 
-        // Setup RecyclerView
-        val recycler = findViewById<RecyclerView>(R.id.jobsRecycler)
-        adapter = JobAdapter(jobs, { job ->
-            // onClick: if downloaded, open local file; otherwise show status
-            if (job.status == "downloaded") {
-                // open localUri
-                job.localUri?.let { uri ->
-                    val intent = Intent(Intent.ACTION_VIEW).apply {
-                        setDataAndType(Uri.parse(uri), "video/*")
-                        flags = Intent.FLAG_GRANT_READ_URI_PERMISSION
-                    }
-                    try {
-                        startActivity(intent)
-                    } catch (e: Exception) {
-                        Toast.makeText(this, "Nie można otworzyć pliku: ${e.message}", Toast.LENGTH_LONG).show()
-                    }
-                }
+        val urlInput: EditText = findViewById(R.id.urlInput)
+        val downloadButton: Button = findViewById(R.id.downloadButton)
+
+        downloadButton.setOnClickListener {
+            val url = urlInput.text.toString().trim()
+            if (url.isNotBlank()) {
+                startYtdlpDownload(url)
+                urlInput.text.clear()
             } else {
-                // Show current status
-                checkStatus(job.jobId)
+                Toast.makeText(this, "Please enter a URL", Toast.LENGTH_SHORT).show()
             }
-        }, {
-            // onChanged callback - save jobs whenever adapter updates
-            saveJobs()
-            updateEmptyState()
-        })
-        recycler.layoutManager = LinearLayoutManager(this)
-        recycler.adapter = adapter
+        }
         
-        // Setup swipe-to-delete
-        setupSwipeToDelete(recycler)
+        // Add long click for test sharing functionality
+        downloadButton.setOnLongClickListener {
+            // Test sharing functionality with a sample YouTube URL
+            val testIntent = Intent(Intent.ACTION_SEND).apply {
+                type = "text/plain"
+                putExtra(Intent.EXTRA_TEXT, "https://www.youtube.com/watch?v=dQw4w9WgXcQ")
+            }
+            Log.d("MainActivity", "Testing sharing with simulated intent")
+            handleSendIntent(testIntent)
+            true
+        }
+
+        loadJobsFromPrefs()
         
-        // Update empty state initially
-        updateEmptyState()
+        // Process sharing intent if it's actually a sharing intent
+        Log.d("MainActivity", "Checking intent for sharing: action=${originalIntent?.action}")
+        if (originalIntent != null) {
+            when (originalIntent.action) {
+                Intent.ACTION_SEND -> {
+                    Log.d("MainActivity", "Found SEND intent, processing...")
+                    handleSendIntent(originalIntent)
+                }
+                Intent.ACTION_VIEW -> {
+                    Log.d("MainActivity", "Found VIEW intent, processing...")
+                    handleSendIntent(originalIntent)
+                }
+                else -> {
+                    Log.d("MainActivity", "No sharing intent found, action: ${originalIntent.action}")
+                }
+            }
+        } else {
+            Log.d("MainActivity", "Intent is null")
+        }
         
-        // Handle share intents when activity is first created - NOW adapter is initialized
-        handleSendIntent(intent)
+        checkPermissions()
+        requestNotificationPermission()
     }
 
     override fun onDestroy() {
+        if (serviceBound) {
+            downloadService?.setCallbacks(null)
+            unbindService(serviceConnection)
+            serviceBound = false
+        }
         super.onDestroy()
+    }
+    
+    override fun onCreateOptionsMenu(menu: Menu?): Boolean {
+        menuInflater.inflate(R.menu.main_menu, menu)
+        return true
+    }
+    
+    override fun onOptionsItemSelected(item: MenuItem): Boolean {
+        return when (item.itemId) {
+            R.id.action_settings -> {
+                showSettingsDialog()
+                true
+            }
+            R.id.action_clear_downloads -> {
+                clearAllJobs()
+                true
+            }
+            else -> super.onOptionsItemSelected(item)
+        }
     }
 
     override fun onNewIntent(intent: Intent) {
@@ -118,23 +230,121 @@ class MainActivity : AppCompatActivity() {
         handleSendIntent(intent)
     }
 
-    // If another app shares text (link), start download directly with ytdlp
-    private fun handleSendIntent(intent: Intent?) {
-        if (intent == null) return
-
-        val action = intent.action
-        val type = intent.type
-
-        if (Intent.ACTION_SEND == action && type == "text/plain") {
-            val sharedText = intent.getStringExtra(Intent.EXTRA_TEXT)
-            if (!sharedText.isNullOrEmpty()) {
-                startYtdlpDownload(sharedText)
+    private fun handleSendIntent(intent: Intent) {
+        // Null check for intent
+        if (intent.action == null) {
+            Log.d("MainActivity", "Intent action is null, skipping processing")
+            return
+        }
+        
+        Log.d("MainActivity", "handleSendIntent called with action: ${intent.action}, type: ${intent.type}")
+        Log.d("MainActivity", "Intent extras: ${intent.extras?.keySet()?.joinToString()}")
+        
+        // Debug: Show what we received
+        val debugInfo = StringBuilder()
+        debugInfo.append("Action: ${intent.action}\n")
+        debugInfo.append("Type: ${intent.type}\n")
+        debugInfo.append("Data: ${intent.data}\n")
+        intent.extras?.let { extras ->
+            for (key in extras.keySet()) {
+                debugInfo.append("$key: ${extras.get(key)}\n")
             }
+        }
+        Log.d("MainActivity", "Full intent info: $debugInfo")
+        
+        when (intent.action) {
+            Intent.ACTION_SEND -> {
+                Log.d("MainActivity", "Processing SEND intent with type: ${intent.type}")
+                val sharedText = intent.getStringExtra(Intent.EXTRA_TEXT)
+                val sharedSubject = intent.getStringExtra(Intent.EXTRA_SUBJECT)
+                Log.d("MainActivity", "Shared text: $sharedText")
+                Log.d("MainActivity", "Shared subject: $sharedSubject")
+                
+                // Try both EXTRA_TEXT and EXTRA_SUBJECT for URL
+                val url = sharedText ?: sharedSubject
+                
+                if (url != null && (url.contains("youtube.com") || url.contains("youtu.be") || url.startsWith("http"))) {
+                    Log.d("MainActivity", "Valid URL found: $url")
+                    
+                    // Show debug dialog (remove this in production)
+                    AlertDialog.Builder(this)
+                        .setTitle("DEBUG: Sharing Received")
+                        .setMessage("Received URL: $url")
+                        .setPositiveButton("Download") { _, _ ->
+                            processSharedUrl(url)
+                        }
+                        .setNegativeButton("Cancel", null)
+                        .show()
+                } else {
+                    Log.d("MainActivity", "No valid URL found in SEND intent")
+                    // Show what we did receive for debugging
+                    if (sharedText != null || sharedSubject != null) {
+                        AlertDialog.Builder(this)
+                            .setTitle("DEBUG: Received non-URL content")
+                            .setMessage("Text: $sharedText\nSubject: $sharedSubject")
+                            .setPositiveButton("OK", null)
+                            .show()
+                    }
+                }
+            }
+            Intent.ACTION_VIEW -> {
+                val data = intent.data
+                Log.d("MainActivity", "Processing VIEW intent with data: $data")
+                if (data != null) {
+                    val url = data.toString()
+                    Log.d("MainActivity", "Received URL via VIEW: $url")
+                    processSharedUrl(url)
+                } else {
+                    Log.d("MainActivity", "No data found in VIEW intent")
+                }
+            }
+            else -> {
+                Log.d("MainActivity", "Unhandled intent action: ${intent.action}")
+            }
+        }
+    }
+    
+    private fun processSharedUrl(url: String) {
+        // Show the shared URL in the input field for user visibility
+        val urlInput: EditText = findViewById(R.id.urlInput)
+        urlInput.setText(url)
+        
+        // Give visual feedback that sharing was received
+        Toast.makeText(this, "URL received from sharing", Toast.LENGTH_SHORT).show()
+
+        // Check if it's a playlist and user allows playlists
+        val isPlaylist = url.contains("list=") || 
+                       url.contains("playlist") || 
+                       url.contains("/playlist?") ||
+                       url.contains("youtube.com/c/") ||
+                       url.contains("youtube.com/@")
+
+        if (isPlaylist && !getAllowPlaylists()) {
+            // Ask user if they want to download playlist
+            AlertDialog.Builder(this)
+                .setTitle("Wykryto playlistę")
+                .setMessage("Czy chcesz pobrać całą playlistę? Możesz to zmienić w ustawieniach.")
+                .setPositiveButton("Tak, pobierz playlistę") { _, _ ->
+                    startYtdlpDownload(url, forcePlaylist = true)
+                    urlInput.text.clear()
+                }
+                .setNegativeButton("Tylko to wideo") { _, _ ->
+                    startYtdlpDownload(url, forcePlaylist = false)
+                    urlInput.text.clear()
+                }
+                .setNegativeButton("Anuluj") { _, _ ->
+                    // Keep URL in field for manual download later
+                }
+                .show()
+        } else {
+            // Auto-start download and show confirmation
+            startYtdlpDownload(url)
+            urlInput.text.clear()
+            Toast.makeText(this, "Starting download from shared URL", Toast.LENGTH_SHORT).show()
         }
     }
 
     private fun showErrorDialog(message: String) {
-        // Use AlertDialog from AppCompat for consistent styling
         val builder = AlertDialog.Builder(this)
         builder.setTitle("Błąd")
         builder.setMessage(message)
@@ -171,18 +381,33 @@ class MainActivity : AppCompatActivity() {
 
     override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults)
-        if (requestCode == PERMISSION_REQUEST_CODE) {
-            val deniedPermissions = permissions.filterIndexed { index, _ -> 
-                grantResults[index] != PackageManager.PERMISSION_GRANTED 
+        when (requestCode) {
+            PERMISSION_REQUEST_CODE -> {
+                val deniedPermissions = permissions.filterIndexed { index, _ -> 
+                    grantResults[index] != PackageManager.PERMISSION_GRANTED 
+                }
+                if (deniedPermissions.isNotEmpty()) {
+                    Toast.makeText(this, "Some permissions were denied. App may not work properly.", Toast.LENGTH_LONG).show()
+                }
             }
-            if (deniedPermissions.isNotEmpty()) {
-                Toast.makeText(this, "Niektóre uprawnienia zostały odrzucone. Aplikacja może nie działać poprawnie.", Toast.LENGTH_LONG).show()
+            NOTIFICATION_PERMISSION_REQUEST_CODE -> {
+                if (grantResults.isNotEmpty() && grantResults[0] != PackageManager.PERMISSION_GRANTED) {
+                    Toast.makeText(this, "Notification permission denied. Background downloads won't show progress.", Toast.LENGTH_LONG).show()
+                }
+            }
+        }
+    }
+    
+    private fun requestNotificationPermission() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            if (ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
+                ActivityCompat.requestPermissions(this, arrayOf(Manifest.permission.POST_NOTIFICATIONS), NOTIFICATION_PERMISSION_REQUEST_CODE)
             }
         }
     }
 
     // Start download directly with ytdlp library
-    private fun startYtdlpDownload(url: String) {
+    private fun startYtdlpDownload(url: String, forcePlaylist: Boolean? = null) {
         // Validate URL first
         val trimmedUrl = url.trim()
         if (trimmedUrl.isBlank() || (!trimmedUrl.startsWith("http://") && !trimmedUrl.startsWith("https://"))) {
@@ -190,17 +415,164 @@ class MainActivity : AppCompatActivity() {
             return
         }
         
-        val jobId = "ytdlp_${System.currentTimeMillis()}"
-        val entry = JobEntry(jobId = jobId, url = trimmedUrl, status = "queued")
-        jobs.add(0, entry)
-        adapter.upsert(entry)
+        val allowPlaylists = forcePlaylist ?: getAllowPlaylists()
+        val isPlaylist = trimmedUrl.contains("list=") || 
+                        trimmedUrl.contains("playlist") || 
+                        trimmedUrl.contains("/playlist?") ||
+                        trimmedUrl.contains("youtube.com/c/") ||
+                        trimmedUrl.contains("youtube.com/@")
         
-        runOnUiThread {
-            Toast.makeText(this, "Dodano do kolejki", Toast.LENGTH_SHORT).show()
+        if (isPlaylist && allowPlaylists) {
+            // Extract playlist info first to create separate jobs
+            extractPlaylistInfo(trimmedUrl)
+        } else {
+            // Single video download
+            val jobId = "ytdlp_${System.currentTimeMillis()}"
+            val entry = JobEntry(jobId = jobId, url = trimmedUrl, status = "queued")
+            jobs.add(0, entry)
+            adapter.upsert(entry)
+            
+            runOnUiThread {
+                Toast.makeText(this, "Dodano do kolejki", Toast.LENGTH_SHORT).show()
+            }
+            
+            // Add to download queue for concurrent processing
+            synchronized(downloadQueue) {
+                downloadQueue.add(entry)
+            }
+            
+            // Try to start download if we're under the concurrent limit
+            processDownloadQueue()
         }
+    }
+    
+    // Extract playlist information and create separate jobs for each video
+    private fun extractPlaylistInfo(playlistUrl: String) {
+        val extractJobId = "extract_${System.currentTimeMillis()}"
+        val extractEntry = JobEntry(jobId = extractJobId, url = playlistUrl, status = "extracting")
+        extractEntry.info = "Pobieranie informacji o playliście..."
+        jobs.add(0, extractEntry)
+        adapter.upsert(extractEntry)
         
+        Thread {
+            try {
+                // Create download directory with null check
+                val externalDir = getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS) 
+                    ?: getExternalFilesDir(null) 
+                    ?: filesDir
+                val youtubeDLDir = File(externalDir, "Everyload")
+                Log.d("YouTubeDL", "Download directory: ${youtubeDLDir.absolutePath}")
+                if (!youtubeDLDir.exists()) {
+                    Log.d("YouTubeDL", "Creating download directory...")
+                    youtubeDLDir.mkdirs()
+                }
+                
+                // Create request to extract playlist info only
+                val request = YoutubeDLRequest(playlistUrl).apply {
+                    addOption("--flat-playlist")
+                    addOption("--print", "%(title)s|||%(id)s|||%(url)s")
+                    addOption("--no-download")
+                }
+                
+                runOnUiThread {
+                    extractEntry.info = "Łączenie z playlistą..."
+                    adapter.upsert(extractEntry)
+                }
+                
+                val youtubeDLInstance = YoutubeDL.getInstance()
+                val output = StringBuilder()
+                
+                youtubeDLInstance?.execute(request) { progress, eta, line ->
+                    if (line.contains("|||")) {
+                        output.appendLine(line)
+                    }
+                    runOnUiThread {
+                        extractEntry.info = "Analizowanie playlisty: ${progress.toInt()}%"
+                        adapter.upsert(extractEntry)
+                    }
+                }
+                
+                // Parse the output to create individual jobs
+                val lines = output.toString().split("\n").filter { it.contains("|||") }
+                
+                runOnUiThread {
+                    // Remove the extraction job
+                    jobs.remove(extractEntry)
+                    adapter.notifyDataSetChanged()
+                    
+                    if (lines.isEmpty()) {
+                        Toast.makeText(this@MainActivity, "Nie znaleziono filmów w playliście", Toast.LENGTH_LONG).show()
+                        return@runOnUiThread
+                    }
+                    
+                    val message = "Znaleziono ${lines.size} filmów w playliście"
+                    Toast.makeText(this@MainActivity, message, Toast.LENGTH_SHORT).show()
+                    
+                    // Create separate jobs for each video
+                    lines.forEachIndexed { index, line ->
+                        val parts = line.split("|||")
+                        if (parts.size >= 3) {
+                            val title = parts[0].trim()
+                            val videoId = parts[1].trim()
+                            val videoUrl = parts[2].trim()
+                            
+                            val jobId = "ytdlp_${System.currentTimeMillis()}_$index"
+                            val videoEntry = JobEntry(
+                                jobId = jobId, 
+                                url = videoUrl.ifEmpty { "https://www.youtube.com/watch?v=$videoId" },
+                                status = "queued",
+                                title = title.ifEmpty { "Video ${index + 1}" }
+                            )
+                            videoEntry.info = "W kolejce (${index + 1}/${lines.size})"
+                            
+                            jobs.add(0, videoEntry)
+                            adapter.upsert(videoEntry)
+                            
+                            // Add to download queue for concurrent processing
+                            synchronized(downloadQueue) {
+                                downloadQueue.add(videoEntry)
+                            }
+                            
+                            // Try to start download if we're under the concurrent limit
+                            processDownloadQueue()
+                        }
+                    }
+                }
+                
+            } catch (e: Exception) {
+                Log.e("YouTubeDL", "Failed to extract playlist info", e)
+                runOnUiThread {
+                    extractEntry.status = "error"
+                    extractEntry.info = "Błąd pobierania informacji o playliście: ${e.message}"
+                    adapter.upsert(extractEntry)
+                    Toast.makeText(this@MainActivity, "Błąd analizy playlisty", Toast.LENGTH_LONG).show()
+                }
+            }
+        }.start()
+    }
+    
+    // Perform actual download for a single video entry using background service
+    private fun performSingleDownload(entry: JobEntry) {
+        if (downloadService != null) {
+            // Use background service
+            val intent = Intent(this, DownloadService::class.java).apply {
+                action = DownloadService.ACTION_START_DOWNLOAD
+                putExtra(DownloadService.EXTRA_JOB_ENTRY, entry)
+            }
+            startService(intent)
+        } else {
+            // Fallback to old method if service not available
+            performSingleDownloadLegacy(entry)
+        }
+    }
+    
+    // Legacy download method (kept as fallback)
+    private fun performSingleDownloadLegacy(entry: JobEntry) {
         // Download directory - use app external files directory for better compatibility
-        val youtubeDLDir = File(getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS), "Everyload")
+        val externalDir = getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS) 
+            ?: getExternalFilesDir(null) 
+            ?: filesDir
+        val youtubeDLDir = File(externalDir, "Everyload")
         if (!youtubeDLDir.exists()) {
             if (!youtubeDLDir.mkdirs()) {
                 runOnUiThread {
@@ -213,16 +585,53 @@ class MainActivity : AppCompatActivity() {
             }
         }
         
-        // Download request with basic options
-        val request = YoutubeDLRequest(trimmedUrl).apply {
+        // Validate download directory
+        if (!youtubeDLDir.exists() || !youtubeDLDir.isDirectory()) {
+            runOnUiThread {
+                entry.status = "error"
+                entry.info = "Download directory is not accessible"
+                adapter.upsert(entry)
+                Toast.makeText(this@MainActivity, "Error: Cannot access download directory", Toast.LENGTH_LONG).show()
+            }
+            return
+        }
+        
+        // Download request with user settings
+        val request = YoutubeDLRequest(entry.url).apply {
             addOption("-o", "${youtubeDLDir.absolutePath}/%(title)s.%(ext)s")
+            
+            // Always download single video (no playlist)
             addOption("--no-playlist")
+            
+            // Format selection based on user preference
+            when (getDownloadFormat()) {
+                "mp3" -> {
+                    addOption("--extract-audio")
+                    addOption("--audio-format", "mp3")
+                    addOption("--audio-quality", "0")
+                }
+                "mp4" -> {
+                    val quality = getDownloadQuality()
+                    if (quality == "best") {
+                        addOption("--format", "best[ext=mp4]")
+                    } else {
+                        addOption("--format", "mp4[height<=${quality.replace("p", "")}]/best[ext=mp4]")
+                    }
+                }
+                else -> { // "best"
+                    val quality = getDownloadQuality()
+                    if (quality == "best") {
+                        addOption("--format", "best")
+                    } else {
+                        addOption("--format", "best[height<=${quality.replace("p", "")}]")
+                    }
+                }
+            }
+            
             // Add options to handle YouTube's anti-bot measures
             addOption("--extractor-retries", "3")
             addOption("--fragment-retries", "3")
             addOption("--skip-unavailable-fragments")
-            // Try to avoid signature challenges
-            addOption("--format", "best[height<=720]") // Lower quality to avoid signature issues
         }
         
         // Update status to downloading
@@ -233,12 +642,12 @@ class MainActivity : AppCompatActivity() {
         
         // Execute download in background thread with automatic retries
         Thread {
-            val maxAttempts = 3
+            val maxAttempts = getMaxAttempts()
             var currentAttempt = 1
             
             while (currentAttempt <= maxAttempts) {
                 try {
-                    Log.d("YouTubeDL", "Starting download for URL: $trimmedUrl (Attempt $currentAttempt/$maxAttempts)")
+                    Log.d("YouTubeDL", "Starting download for URL: ${entry.url} (Attempt $currentAttempt/$maxAttempts)")
                     Log.d("YouTubeDL", "Download directory: ${youtubeDLDir.absolutePath}")
                     
                     // Update status with attempt info
@@ -248,15 +657,6 @@ class MainActivity : AppCompatActivity() {
                     }
                     
                     val youtubeDLInstance = YoutubeDL.getInstance()
-                    if (youtubeDLInstance == null) {
-                        runOnUiThread {
-                            entry.status = "error"
-                            entry.info = "YoutubeDL nie został zainicjalizowany"
-                            adapter.upsert(entry)
-                            Toast.makeText(this@MainActivity, "Błąd inicjalizacji YoutubeDL", Toast.LENGTH_LONG).show()
-                        }
-                        return@Thread
-                    }
                     
                     youtubeDLInstance.execute(request) { progress, eta, line ->
                         Log.d("YouTubeDL", "$progress% (ETA $eta seconds) - $line")
@@ -316,7 +716,7 @@ class MainActivity : AppCompatActivity() {
                 
                 } catch (e: YoutubeDLException) {
                     val errorMsg = e.message ?: "Nieznany błąd"
-                    Log.e("YouTubeDL", "Download failed for URL: $trimmedUrl (Attempt $currentAttempt/$maxAttempts)", e)
+                    Log.e("YouTubeDL", "Download failed for URL: ${entry.url} (Attempt $currentAttempt/$maxAttempts)", e)
                     
                     if (currentAttempt < maxAttempts) {
                         // Not the last attempt, show retry info
@@ -382,6 +782,169 @@ class MainActivity : AppCompatActivity() {
         }.start()
     }
     
+    private fun showSettingsDialog() {
+        val dialogView = layoutInflater.inflate(R.layout.dialog_settings, null)
+        
+        // Get UI elements
+        val formatSpinner = dialogView.findViewById<Spinner>(R.id.formatSpinner)
+        val qualitySpinner = dialogView.findViewById<Spinner>(R.id.qualitySpinner)
+        val attemptsSeekBar = dialogView.findViewById<SeekBar>(R.id.attemptsSeekBar)
+        val attemptsText = dialogView.findViewById<TextView>(R.id.attemptsText)
+        val playlistSwitch = dialogView.findViewById<Switch>(R.id.playlistSwitch)
+        val stopAllButton = dialogView.findViewById<Button>(R.id.stopAllButton)
+        
+        // Setup format spinner
+        val formatAdapter = ArrayAdapter.createFromResource(
+            this,
+            R.array.format_options,
+            android.R.layout.simple_spinner_item
+        )
+        formatAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
+        formatSpinner.adapter = formatAdapter
+        formatSpinner.setSelection(when(getDownloadFormat()) {
+            "mp3" -> 0
+            "mp4" -> 1
+            else -> 2
+        })
+        
+        // Setup quality spinner
+        val qualityAdapter = ArrayAdapter.createFromResource(
+            this,
+            R.array.quality_options,
+            android.R.layout.simple_spinner_item
+        )
+        qualityAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
+        qualitySpinner.adapter = qualityAdapter
+        qualitySpinner.setSelection(when(getDownloadQuality()) {
+            "480p" -> 0
+            "720p" -> 1
+            "1080p" -> 2
+            else -> 3
+        })
+        
+        // Setup attempts seekbar
+        attemptsSeekBar.max = 7 // 1-8 attempts
+        attemptsSeekBar.progress = getMaxAttempts() - 1
+        attemptsText.text = "Maksymalne próby: ${getMaxAttempts()}"
+        attemptsSeekBar.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
+            override fun onProgressChanged(seekBar: SeekBar?, progress: Int, fromUser: Boolean) {
+                attemptsText.text = "Maksymalne próby: ${progress + 1}"
+            }
+            override fun onStartTrackingTouch(seekBar: SeekBar?) {}
+            override fun onStopTrackingTouch(seekBar: SeekBar?) {}
+        })
+        
+        // Setup playlist switch
+        playlistSwitch.isChecked = getAllowPlaylists()
+        
+        // Setup concurrent downloads seekbar (1-10 downloads)
+        val concurrentDownloadsSeekBar = dialogView.findViewById<SeekBar>(R.id.concurrentDownloadsSeekBar)
+        val concurrentDownloadsText = dialogView.findViewById<TextView>(R.id.concurrentDownloadsText)
+        
+        concurrentDownloadsSeekBar.max = 9 // 0-9 range = 1-10 downloads
+        concurrentDownloadsSeekBar.progress = getMaxConcurrentDownloads() - 1 // Convert to 0-based
+        concurrentDownloadsText.text = "Max concurrent downloads: ${getMaxConcurrentDownloads()}"
+        
+        concurrentDownloadsSeekBar.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
+            override fun onProgressChanged(seekBar: SeekBar?, progress: Int, fromUser: Boolean) {
+                val actualValue = progress + 1 // Convert back to 1-10 range
+                concurrentDownloadsText.text = "Max concurrent downloads: $actualValue"
+            }
+            override fun onStartTrackingTouch(seekBar: SeekBar?) {}
+            override fun onStopTrackingTouch(seekBar: SeekBar?) {}
+        })
+        
+        // Setup stop all downloads button
+        stopAllButton.setOnClickListener {
+            stopAllDownloads()
+        }
+        
+        AlertDialog.Builder(this)
+            .setTitle("Ustawienia")
+            .setView(dialogView)
+            .setPositiveButton("Zapisz") { _, _ ->
+                // Save settings
+                val editor = settings.edit()
+                
+                val selectedFormat = when(formatSpinner.selectedItemPosition) {
+                    0 -> "mp3"
+                    1 -> "mp4"
+                    else -> "best"
+                }
+                editor.putString(KEY_FORMAT, selectedFormat)
+                
+                val selectedQuality = when(qualitySpinner.selectedItemPosition) {
+                    0 -> "480p"
+                    1 -> "720p"
+                    2 -> "1080p"
+                    else -> "best"
+                }
+                editor.putString(KEY_QUALITY, selectedQuality)
+                
+                editor.putInt(KEY_MAX_ATTEMPTS, attemptsSeekBar.progress + 1)
+                editor.putBoolean(KEY_ALLOW_PLAYLISTS, playlistSwitch.isChecked)
+                editor.putInt(KEY_MAX_CONCURRENT_DOWNLOADS, concurrentDownloadsSeekBar.progress + 1) // Convert back to 1-10 range
+                editor.apply()
+                
+                Toast.makeText(this, "Ustawienia zapisane", Toast.LENGTH_SHORT).show()
+            }
+            .setNegativeButton("Anuluj", null)
+            .show()
+    }
+    
+    // DownloadService.DownloadServiceCallbacks implementation
+    override fun onJobUpdated(job: JobEntry) {
+        runOnUiThread {
+            adapter.upsert(job)
+        }
+    }
+    
+    override fun onDownloadCompleted(job: JobEntry) {
+        runOnUiThread {
+            adapter.upsert(job)
+            val fileName = job.localUri?.substringAfterLast("/") ?: "file"
+            Toast.makeText(this, "Downloaded: $fileName", Toast.LENGTH_SHORT).show()
+            
+            // Decrease active count and process queue
+            synchronized(downloadQueue) {
+                activeDownloadCount--
+            }
+            processDownloadQueue()
+        }
+    }
+
+    override fun onDownloadFailed(job: JobEntry, error: String) {
+        runOnUiThread {
+            adapter.upsert(job)
+            Toast.makeText(this, "Download failed: ${job.title ?: job.jobId}", Toast.LENGTH_SHORT).show()
+            
+            // Decrease active count and process queue
+            synchronized(downloadQueue) {
+                activeDownloadCount--
+            }
+            processDownloadQueue()
+        }
+    }
+    
+    private fun processDownloadQueue() {
+        synchronized(downloadQueue) {
+            val maxConcurrent = getMaxConcurrentDownloads()
+            
+            while (activeDownloadCount < maxConcurrent && downloadQueue.isNotEmpty()) {
+                val nextJob = downloadQueue.removeAt(0)
+                activeDownloadCount++
+                
+                runOnUiThread {
+                    nextJob.info = "Starting download..."
+                    adapter.upsert(nextJob)
+                }
+                
+                // Start download
+                performSingleDownload(nextJob)
+            }
+        }
+    }
+    
     private fun getMimeType(fileName: String): String {
         val extension = fileName.substringAfterLast('.', "")
         return when (extension.lowercase()) {
@@ -393,200 +956,138 @@ class MainActivity : AppCompatActivity() {
             "mp3" -> "audio/mpeg"
             "m4a" -> "audio/mp4"
             "ogg" -> "audio/ogg"
-            "flac" -> "audio/flac"
+            "wav" -> "audio/wav"
             else -> "application/octet-stream"
         }
     }
 
-    private fun checkStatus(jobId: String, showDialog: Boolean = true) {
-        Log.d("Everyload", "checkStatus request for $jobId showDialog=$showDialog")
-        val job = jobs.find { it.jobId == jobId }
-        if (job != null) {
-            val msg = "Status: ${job.status}\n${if (!job.info.isNullOrEmpty()) "Info: ${job.info}" else ""}"
-            if (showDialog) {
-                runOnUiThread {
-                    AlertDialog.Builder(this).setTitle("Status").setMessage(msg).setPositiveButton("OK") { d, _ -> d.dismiss() }.show()
-                }
-            }
-        }
-    }
-
-    private fun sanitizeFilename(name: String): String {
-        var n = name
-        
-        // Replace spaces with underscores
-        n = n.replace(" ", "_")
-        
-        // Remove emojis and special Unicode characters (keep only basic Latin, digits, underscore, dash, dot)
-        n = n.replace(Regex("[^a-zA-Z0-9._-]"), "_")
-        
-        // Replace multiple consecutive underscores with single underscore
-        n = n.replace(Regex("_{2,}"), "_")
-        
-        // Trim underscores from start and end
-        n = n.trim('_')
-        
-        // Fallback to timestamp if empty after sanitization
-        if (n.isEmpty()) n = "downloaded_file_${System.currentTimeMillis()}"
-        
-        return n
-    }
-
-    // Save jobs to SharedPreferences as JSON
-    private fun saveJobs() {
-        try {
-            val prefs = getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-            val jsonArray = JSONArray()
-            for (job in jobs) {
-                val obj = JSONObject()
-                obj.put("jobId", job.jobId)
-                obj.put("url", job.url)
-                obj.put("status", job.status)
-                obj.put("info", job.info ?: "")
-                obj.put("localUri", job.localUri ?: "")
-                obj.put("downloadTriggered", job.downloadTriggered)
-                // save files array
-                if (job.files != null) {
-                    val filesArr = JSONArray()
-                    for (f in job.files!!) filesArr.put(f)
-                    obj.put("files", filesArr)
-                }
-                jsonArray.put(obj)
-            }
-            prefs.edit().putString(KEY_JOBS, jsonArray.toString()).apply()
-            Log.d("Everyload", "Saved ${jobs.size} jobs to SharedPreferences")
-        } catch (e: Exception) {
-            Log.e("Everyload", "Error saving jobs: ${e.message}")
-        }
-    }
-
-    // Load jobs from SharedPreferences, filter out error/download_error statuses
-    private fun loadJobs() {
-        try {
-            val prefs = getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-            val jsonStr = prefs.getString(KEY_JOBS, null)
-            if (jsonStr != null) {
-                val jsonArray = JSONArray(jsonStr)
-                for (i in 0 until jsonArray.length()) {
-                    val obj = jsonArray.getJSONObject(i)
-                    val status = obj.optString("status", "queued")
-                    // Skip error jobs (forget them)
-                    if (status == "error" || status == "download_error") {
-                        Log.d("Everyload", "Skipping error job ${obj.optString("jobId")}")
-                        continue
-                    }
-                    val job = JobEntry(
-                        jobId = obj.getString("jobId"),
-                        url = obj.getString("url"),
-                        status = status,
-                        info = obj.optString("info", null).takeIf { it.isNotEmpty() },
-                        localUri = obj.optString("localUri", null).takeIf { it.isNotEmpty() },
-                        downloadTriggered = obj.optBoolean("downloadTriggered", false)
-                    )
-                    // restore files array
-                    val filesArr = obj.optJSONArray("files")
-                    if (filesArr != null) {
-                        val list = mutableListOf<String>()
-                        for (j in 0 until filesArr.length()) {
-                            list.add(filesArr.getString(j))
-                        }
-                        job.files = list
-                    }
-                    jobs.add(job)
-                }
-                Log.d("Everyload", "Loaded ${jobs.size} jobs from SharedPreferences")
-            }
-        } catch (e: Exception) {
-            Log.e("Everyload", "Error loading jobs: ${e.message}")
-        }
-    }
-
-    private fun setupSwipeToDelete(recyclerView: RecyclerView) {
-        val itemTouchHelper = ItemTouchHelper(object : ItemTouchHelper.SimpleCallback(
-            0, ItemTouchHelper.LEFT or ItemTouchHelper.RIGHT
-        ) {
-            override fun onMove(
-                recyclerView: RecyclerView,
-                viewHolder: RecyclerView.ViewHolder,
-                target: RecyclerView.ViewHolder
-            ): Boolean = false
-
-            override fun onSwiped(viewHolder: RecyclerView.ViewHolder, direction: Int) {
-                val position = viewHolder.adapterPosition
-                val job = jobs[position]
-                showDeleteDialog(job, position)
-            }
-        })
-        itemTouchHelper.attachToRecyclerView(recyclerView)
-    }
-
-    private fun showDeleteDialog(job: JobEntry, position: Int) {
-        val hasLocalFile = job.localUri != null
-        
-        val builder = AlertDialog.Builder(this)
-        builder.setTitle("Usuń ${job.files?.firstOrNull() ?: job.jobId}?")
-        
-        if (hasLocalFile) {
-            builder.setMessage("Co chcesz usunąć?")
-            builder.setPositiveButton("Tylko z listy") { _, _ ->
-                deleteJob(job, position, deleteFile = false)
-            }
-            builder.setNeutralButton("Z listy i telefonu") { _, _ ->
-                deleteJob(job, position, deleteFile = true)
-            }
-            builder.setNegativeButton("Anuluj") { _, _ ->
-                adapter.notifyItemChanged(position) // Restore the item
-            }
-        } else {
-            builder.setMessage("Usunąć z listy?")
-            builder.setPositiveButton("Tak") { _, _ ->
-                deleteJob(job, position, deleteFile = false)
-            }
-            builder.setNegativeButton("Nie") { _, _ ->
-                adapter.notifyItemChanged(position) // Restore the item
-            }
-        }
-        
-        builder.setOnCancelListener {
-            adapter.notifyItemChanged(position) // Restore the item if dialog is dismissed
-        }
-        
-        builder.show()
-    }
-
-    private fun deleteJob(job: JobEntry, position: Int, deleteFile: Boolean) {
-        // Delete file from device if requested
-        if (deleteFile && job.localUri != null) {
+    private fun handleJobClick(job: JobEntry) {
+        if (job.status == "downloaded" && !job.localUri.isNullOrEmpty()) {
             try {
-                val uri = Uri.parse(job.localUri)
-                contentResolver.delete(uri, null, null)
-                Log.d("Everyload", "Deleted file: ${job.localUri}")
-                Toast.makeText(this, "Usunięto plik", Toast.LENGTH_SHORT).show()
+                val intent = Intent(Intent.ACTION_VIEW)
+                intent.setDataAndType(Uri.parse(job.localUri), getMimeType(job.localUri!!))
+                intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                startActivity(intent)
             } catch (e: Exception) {
-                Log.e("Everyload", "Error deleting file: ${e.message}")
-                Toast.makeText(this, "Błąd usuwania pliku: ${e.message}", Toast.LENGTH_SHORT).show()
+                Toast.makeText(this, "Nie można otworzyć pliku: ${e.message}", Toast.LENGTH_LONG).show()
             }
         }
-        
-        // Remove from list
-        jobs.removeAt(position)
-        adapter.notifyItemRemoved(position)
-        saveJobs()
-        updateEmptyState()
-        
-        Log.d("Everyload", "Removed job ${job.jobId} from list")
     }
 
-    private fun updateEmptyState() {
-        val emptyState = findViewById<View>(R.id.emptyStateView)
-        val recycler = findViewById<RecyclerView>(R.id.jobsRecycler)
+    private fun saveJobsToPrefs() {
+        val filteredJobs = jobs.filter { it.status != "downloading" || !it.info.isNullOrEmpty() && it.info!!.contains("%") }
         
-        if (jobs.isEmpty()) {
-            emptyState.visibility = View.VISIBLE
-            recycler.visibility = View.GONE
+        val prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
+        
+        try {
+            val jsonArray = JSONArray()
+            for (job in filteredJobs) {
+                val json = JSONObject().apply {
+                    put("jobId", job.jobId)
+                    put("url", job.url)
+                    put("status", job.status)
+                    put("info", job.info ?: "")
+                    put("title", job.title ?: "")
+                    if (job.files != null) put("files", JSONArray(job.files!!))
+                    if (job.localUri != null) put("localUri", job.localUri!!)
+                    if (job.downloadId != null) put("downloadId", job.downloadId!!)
+                }
+                jsonArray.put(json)
+            }
+            
+            prefs.edit().putString(KEY_JOBS, jsonArray.toString()).apply()
+        } catch (e: Exception) {
+            Log.e("MainActivity", "Failed to save jobs", e)
+        }
+    }
+
+    private fun loadJobsFromPrefs() {
+        val prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
+        val jobsJson = prefs.getString(KEY_JOBS, "[]") ?: "[]"
+        
+        try {
+            val jsonArray = JSONArray(jobsJson)
+            for (i in 0 until jsonArray.length()) {
+                val json = jsonArray.getJSONObject(i)
+                val files = if (json.has("files")) {
+                    val filesArray = json.getJSONArray("files")
+                    List(filesArray.length()) { idx -> filesArray.getString(idx) }
+                } else null
+                
+                val job = JobEntry(
+                    jobId = json.getString("jobId"),
+                    url = json.getString("url"),
+                    status = json.getString("status"),
+                    info = json.optString("info", null),
+                    title = json.optString("title", null),
+                    files = files,
+                    localUri = json.optString("localUri", null),
+                    downloadId = if (json.has("downloadId")) json.getLong("downloadId") else null
+                )
+                jobs.add(job)
+            }
+            adapter.notifyDataSetChanged()
+        } catch (e: Exception) {
+            Log.e("MainActivity", "Failed to load jobs", e)
+        }
+    }
+
+    private fun clearAllJobs() {
+        val completedJobs = jobs.filter { job ->
+            job.status == "downloaded" || job.status == "finished" || job.status == "error"
+        }
+        
+        if (completedJobs.isNotEmpty()) {
+            AlertDialog.Builder(this)
+                .setTitle("Wyczyść listę")
+                .setMessage("Czy chcesz usunąć ${completedJobs.size} zakończonych zadań?")
+                .setPositiveButton("Tak") { _, _ ->
+                    jobs.removeAll(completedJobs.toSet())
+                    adapter.notifyDataSetChanged()
+                    saveJobsToPrefs()
+                    Toast.makeText(this, "Usunięto ${completedJobs.size} zadań", Toast.LENGTH_SHORT).show()
+                }
+                .setNegativeButton("Anuluj", null)
+                .show()
         } else {
-            emptyState.visibility = View.GONE
-            recycler.visibility = View.VISIBLE
+            Toast.makeText(this, "Brak zadań do usunięcia", Toast.LENGTH_SHORT).show()
+        }
+    }
+    
+    private fun stopAllDownloads() {
+        val activeJobs = jobs.filter { job ->
+            job.status == "downloading" || job.status == "queued" || job.status == "pending"
+        }
+        
+        if (activeJobs.isNotEmpty()) {
+            AlertDialog.Builder(this)
+                .setTitle("Zatrzymaj pobierania")
+                .setMessage("Czy chcesz zatrzymać wszystkie aktywne pobierania? (${activeJobs.size} zadań)")
+                .setPositiveButton("Tak") { _, _ ->
+                    // Clear download queue and reset active count
+                    synchronized(downloadQueue) {
+                        downloadQueue.clear()
+                        activeDownloadCount = 0
+                    }
+                    
+                    // Stop the download service
+                    val stopIntent = Intent(this, DownloadService::class.java)
+                    stopIntent.action = DownloadService.ACTION_STOP_SERVICE
+                    startService(stopIntent)
+                    
+                    // Update job statuses
+                    activeJobs.forEach { job ->
+                        job.status = "stopped"
+                    }
+                    adapter.notifyDataSetChanged()
+                    saveJobsToPrefs()
+                    
+                    Toast.makeText(this, "Zatrzymano ${activeJobs.size} zadań", Toast.LENGTH_SHORT).show()
+                }
+                .setNegativeButton("Anuluj", null)
+                .show()
+        } else {
+            Toast.makeText(this, "Brak aktywnych pobrań do zatrzymania", Toast.LENGTH_SHORT).show()
         }
     }
 }

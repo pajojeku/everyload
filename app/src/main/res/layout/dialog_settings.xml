@@ -1,0 +1,110 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:padding="24dp">
+
+    <!-- Format Selection -->
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Format pobierania"
+        android:textSize="16sp"
+        android:textStyle="bold"
+        android:layout_marginBottom="8dp" />
+
+    <Spinner
+        android:id="@+id/formatSpinner"
+        android:layout_width="match_parent"
+        android:layout_height="48dp"
+        android:layout_marginBottom="16dp" />
+
+    <!-- Quality Selection -->
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Jakość wideo"
+        android:textSize="16sp"
+        android:textStyle="bold"
+        android:layout_marginBottom="8dp" />
+
+    <Spinner
+        android:id="@+id/qualitySpinner"
+        android:layout_width="match_parent"
+        android:layout_height="48dp"
+        android:layout_marginBottom="16dp" />
+
+    <!-- Max Attempts -->
+    <TextView
+        android:id="@+id/attemptsText"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Maksymalne próby: 3"
+        android:textSize="16sp"
+        android:textStyle="bold"
+        android:layout_marginBottom="8dp" />
+
+    <SeekBar
+        android:id="@+id/attemptsSeekBar"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginBottom="16dp" />
+
+    <!-- Playlist Support -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center_vertical">
+
+        <TextView
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="Pobieraj playlisty automatycznie"
+            android:textSize="16sp" />
+
+        <Switch
+            android:id="@+id/playlistSwitch"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content" />
+
+    </LinearLayout>
+
+    <!-- Concurrent Downloads Limit -->
+    <TextView
+        android:id="@+id/concurrentDownloadsText"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Max concurrent downloads: 3"
+        android:textSize="16sp"
+        android:textStyle="bold"
+        android:layout_marginTop="16dp"
+        android:layout_marginBottom="4dp" />
+    
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Maksymalna liczba jednoczesnych pobrań"
+        android:textSize="14sp"
+        android:textColor="?android:attr/textColorSecondary"
+        android:layout_marginBottom="8dp" />
+
+    <SeekBar
+        android:id="@+id/concurrentDownloadsSeekBar"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginBottom="16dp" />
+
+    <!-- Stop All Downloads Button -->
+    <Button
+        android:id="@+id/stopAllButton"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Stop All Downloads"
+        android:textColor="@android:color/white"
+        android:backgroundTint="@android:color/holo_red_dark"
+        android:layout_marginBottom="16dp" />
+
+</LinearLayout>

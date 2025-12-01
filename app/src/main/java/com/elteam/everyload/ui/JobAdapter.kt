@@ -32,8 +32,9 @@ class JobAdapter(
 
     override fun onBindViewHolder(holder: VH, position: Int) {
         val item = items[position]
-        // show filename if available, otherwise jobId
-        holder.title.text = item.files?.firstOrNull() ?: item.jobId
+        
+        // Show video title if available, otherwise show filename or jobId
+        holder.title.text = item.title ?: item.files?.firstOrNull() ?: item.jobId
         holder.url.text = item.localUri ?: item.url
         
         // Style status based on state
@@ -74,6 +75,18 @@ class JobAdapter(
                 holder.status.setTypeface(null, Typeface.NORMAL)
                 holder.spinner.visibility = View.VISIBLE
             }
+            "extracting" -> {
+                holder.status.text = "Extracting playlist..."
+                holder.status.setTextColor(ContextCompat.getColor(holder.itemView.context, R.color.status_downloading))
+                holder.status.setTypeface(null, Typeface.NORMAL)
+                holder.spinner.visibility = View.VISIBLE
+            }
+            "stopped" -> {
+                holder.status.text = "Stopped"
+                holder.status.setTextColor(ContextCompat.getColor(holder.itemView.context, R.color.status_error))
+                holder.status.setTypeface(null, Typeface.NORMAL)
+                holder.spinner.visibility = View.GONE
+            }
             else -> {
                 holder.status.text = item.status
                 holder.status.setTextColor(ContextCompat.getColor(holder.itemView.context, R.color.status_queued))
@@ -82,6 +95,7 @@ class JobAdapter(
             }
         }
         
+        // Show info field for progress or additional information
         if (!item.info.isNullOrEmpty()) {
             holder.info.visibility = View.VISIBLE
             holder.info.text = item.info

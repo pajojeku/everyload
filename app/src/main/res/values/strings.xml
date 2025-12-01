@@ -1,3 +1,19 @@
 <resources>
     <string name="app_name">Everyload</string>
+    <string name="action_settings">Settings</string>
+    
+    <!-- Format options -->
+    <string-array name="format_options">
+        <item>MP3 (tylko audio)</item>
+        <item>MP4 (wideo)</item>
+        <item>Najlepsza jakość</item>
+    </string-array>
+    
+    <!-- Quality options -->
+    <string-array name="quality_options">
+        <item>480p</item>
+        <item>720p</item>
+        <item>1080p</item>
+        <item>Najlepsza dostępna</item>
+    </string-array>
 </resources>

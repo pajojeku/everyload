@@ -8,6 +8,18 @@
     android:background="?android:attr/colorBackground"
     tools:context=".MainActivity">
 
+    <!-- Toolbar for menu -->
+    <androidx.appcompat.widget.Toolbar
+        android:id="@+id/toolbar"
+        android:layout_width="0dp"
+        android:layout_height="?attr/actionBarSize"
+        android:background="?attr/colorPrimary"
+        android:theme="@style/ThemeOverlay.AppCompat.Dark.ActionBar"
+        app:popupTheme="@style/ThemeOverlay.AppCompat.Light"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintTop_toTopOf="parent" />
+
     <!-- Google-style large title -->
     <TextView
         android:id="@+id/appTitle"
@@ -20,10 +32,48 @@
         android:fontFamily="sans-serif-medium"
         android:letterSpacing="-0.01"
         android:layout_marginStart="24dp"
-        android:layout_marginTop="24dp"
+        android:layout_marginTop="16dp"
         android:layout_marginBottom="16dp"
         app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toTopOf="parent" />
+        app:layout_constraintTop_toBottomOf="@+id/toolbar" />
+
+    <!-- URL Input Section -->
+    <LinearLayout
+        android:id="@+id/inputSection"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:layout_marginStart="24dp"
+        android:layout_marginEnd="24dp"
+        android:layout_marginTop="16dp"
+        android:gravity="center_vertical"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintTop_toBottomOf="@+id/appTitle">
+
+        <EditText
+            android:id="@+id/urlInput"
+            android:layout_width="0dp"
+            android:layout_height="56dp"
+            android:layout_weight="1"
+            android:hint="Wklej link do wideo lub playlisty..."
+            android:inputType="textUri"
+            android:background="@drawable/input_background"
+            android:paddingStart="16dp"
+            android:paddingEnd="16dp"
+            android:textColorHint="?attr/colorOnSurfaceVariant"
+            android:textColor="?attr/colorOnSurface"
+            android:layout_marginEnd="8dp" />
+
+        <Button
+            android:id="@+id/downloadButton"
+            android:layout_width="wrap_content"
+            android:layout_height="56dp"
+            android:text="Pobierz"
+            android:textAllCaps="false"
+            style="@style/Widget.Material3.Button.UnelevatedButton" />
+
+    </LinearLayout>
 
     <!-- Subtle divider -->
     <View
@@ -34,7 +84,7 @@
         android:layout_marginTop="12dp"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintTop_toBottomOf="@id/appTitle" />
+        app:layout_constraintTop_toBottomOf="@id/inputSection" />
 
     <androidx.recyclerview.widget.RecyclerView
         android:id="@+id/jobsRecycler"
