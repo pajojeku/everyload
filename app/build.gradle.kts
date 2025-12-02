@@ -60,6 +60,7 @@ dependencies {
     androidTestImplementation(libs.androidx.espresso.core)
 
     implementation("io.github.junkfood02.youtubedl-android:library:${youtubedlAndroid}")
-    // FFmpeg dependency removed - using format selection instead of conversion
+    // FFmpeg for audio extraction and conversion
+    implementation("io.github.junkfood02.youtubedl-android:ffmpeg:${youtubedlAndroid}")
     implementation("io.github.junkfood02.youtubedl-android:aria2c:${youtubedlAndroid}")
 }

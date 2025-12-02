@@ -130,4 +130,17 @@
     <!-- Menu -->
     <string name="action_settings">Ustawienia</string>
     <string name="action_clear_downloads">Wyczyść wszystko</string>
+    <string name="action_update_ytdlp">Aktualizuj yt-dlp</string>
+    
+    <!-- yt-dlp update -->
+    <string name="settings_ytdlp_section">Silnik yt-dlp</string>
+    <string name="settings_ytdlp_version">Wersja: %s</string>
+    <string name="settings_ytdlp_version_unknown">Wersja: nieznana (wbudowana)</string>
+    <string name="settings_update_ytdlp">Aktualizuj yt-dlp</string>
+    <string name="settings_ytdlp_info">Zaktualizuj yt-dlp, aby pobierać z więcej serwisów: Reddit, TikTok, Instagram, itp.</string>
+    <string name="toast_ytdlp_updating">Aktualizowanie yt-dlp…</string>
+    <string name="toast_ytdlp_updated">yt-dlp zaktualizowano do %s</string>
+    <string name="toast_ytdlp_up_to_date">yt-dlp jest już aktualne (%s)</string>
+    <string name="toast_ytdlp_update_failed">Aktualizacja yt-dlp nieudana: %s</string>
+    <string name="dialog_link_not_valid">Otrzymano: %s\n\nTo nie wygląda na prawidłowy link do wideo.</string>
 </resources>

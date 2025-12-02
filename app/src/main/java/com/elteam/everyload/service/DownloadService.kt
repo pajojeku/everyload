@@ -14,6 +14,7 @@ import com.elteam.everyload.model.JobEntry
 import com.yausername.youtubedl_android.YoutubeDL
 import com.yausername.youtubedl_android.YoutubeDLRequest
 import com.yausername.youtubedl_android.YoutubeDLException
+import com.yausername.ffmpeg.FFmpeg
 import java.io.File
 import androidx.core.content.FileProvider
 import java.util.concurrent.ConcurrentHashMap
@@ -73,10 +74,11 @@ class DownloadService : Service() {
             }
             
             YoutubeDL.getInstance().init(this)
-            Log.d("DownloadService", "YoutubeDL initialized successfully")
+            FFmpeg.getInstance().init(this)
+            Log.d("DownloadService", "YoutubeDL and FFmpeg initialized successfully")
             
         } catch (e: YoutubeDLException) {
-            Log.e("DownloadService", "Failed to initialize YoutubeDL", e)
+            Log.e("DownloadService", "Failed to initialize YoutubeDL/FFmpeg", e)
         }
         
         Log.d("DownloadService", "Service created")
@@ -216,13 +218,16 @@ class DownloadService : Service() {
                         addOption("--no-playlist")
                         addOption("--print", "%(title)s")
                         addOption("--skip-download")
+                        // Add user agent for better compatibility
+                        addOption("--user-agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
+                        addOption("--no-check-certificates")
                     }
                     
                     val youtubeDLInstance = YoutubeDL.getInstance()
                     val result = youtubeDLInstance.execute(infoRequest) { _, _, _ -> }
                     
                     val extractedTitle = result.out?.trim()
-                    if (!extractedTitle.isNullOrEmpty() && extractedTitle != "NA") {
+                    if (!extractedTitle.isNullOrEmpty() && extractedTitle != "NA" && !extractedTitle.startsWith("ERROR")) {
                         job.title = extractedTitle
                         Log.d("DownloadService", "Extracted title: ${job.title}")
                     }
@@ -316,43 +321,56 @@ class DownloadService : Service() {
                 
                 safeAddOption("-o", outputTemplate)
                 addOption("--no-playlist")
-
-                // Format settings with MP3 prioritization
-                when (requestedFormat) {
-                    "mp3" -> {
-                        // Try to get MP3 directly, fallback to best audio
-                        Log.d("DownloadService", "Attempting MP3 download with multiple format options")
-                        safeAddOption("--format", "bestaudio[ext=mp3]/bestaudio[ext=m4a]/bestaudio/best")
-                        job.info = "Downloading audio (MP3 preferred)"
-                    }
-                    "mp4" -> {
-                        val quality = getDownloadQuality()
-                        Log.d("DownloadService", "MP4 quality: $quality")
-                        if (quality == "best") {
-                            safeAddOption("--format", "best[ext=mp4]/best")
-                        } else {
-                            val qualityNum = quality.replace("p", "")
-                            safeAddOption("--format", "mp4[height<=$qualityNum]/best[height<=$qualityNum]/best")
+                
+                // Add user agent for better compatibility with various sites
+                addOption("--user-agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
+                
+                // Allow redirects and handle various site quirks
+                addOption("--no-check-certificates")
+                
+                // Check if this is a YouTube URL
+                val isYouTube = job.url.contains("youtube.com") || job.url.contains("youtu.be")
+                
+                if (isYouTube) {
+                    // For YouTube, apply format and quality settings
+                    when (requestedFormat) {
+                        "mp3" -> {
+                            Log.d("DownloadService", "YouTube MP3 download")
+                            safeAddOption("--format", "bestaudio[ext=mp3]/bestaudio[ext=m4a]/bestaudio/best")
+                            job.info = "Downloading audio (MP3 preferred)"
+                        }
+                        "mp4" -> {
+                            val quality = getDownloadQuality()
+                            Log.d("DownloadService", "YouTube MP4 quality: $quality")
+                            if (quality == "best") {
+                                safeAddOption("--format", "best[ext=mp4]/best[vcodec!=none][acodec!=none]/best")
+                            } else {
+                                val qualityNum = quality.replace("p", "")
+                                safeAddOption("--format", "best[height<=$qualityNum][ext=mp4]/best[height<=$qualityNum][vcodec!=none][acodec!=none]/best[height<=$qualityNum]/best")
+                            }
+                        }
+                        else -> {
+                            val quality = getDownloadQuality()
+                            Log.d("DownloadService", "YouTube general quality: $quality")
+                            if (quality == "best") {
+                                safeAddOption("--format", "best[vcodec!=none][acodec!=none]/best")
+                            } else {
+                                val qualityNum = quality.replace("p", "")
+                                safeAddOption("--format", "best[height<=$qualityNum][vcodec!=none][acodec!=none]/best[height<=$qualityNum]/best")
+                            }
                         }
                     }
-                    else -> {
-                        val quality = getDownloadQuality()
-                        Log.d("DownloadService", "General quality: $quality")
-                        if (quality == "best") {
-                            safeAddOption("--format", "best")
-                        } else {
-                            val qualityNum = quality.replace("p", "")
-                            safeAddOption("--format", "best[height<=$qualityNum]/best")
-                        }
-                    }
+                } else {
+                    // For non-YouTube sites, don't specify format at all - let yt-dlp decide
+                    // This mirrors the behavior of the Python server which works correctly
+                    Log.d("DownloadService", "Non-YouTube site detected, using default yt-dlp format selection")
+                    // No --format option - yt-dlp will pick the best available format automatically
+                    job.info = "Downloading..."
                 }
 
                 addOption("--extractor-retries", "3")
                 addOption("--fragment-retries", "3")
                 addOption("--skip-unavailable-fragments")
-                
-                // Explicitly prevent FFmpeg operations to avoid native library issues
-                addOption("--no-post-overwrites")
             }
 
             val maxAttempts = getMaxAttempts()

@@ -52,6 +52,7 @@ import android.os.IBinder
 import com.yausername.youtubedl_android.YoutubeDL
 import com.yausername.youtubedl_android.YoutubeDLRequest
 import com.yausername.youtubedl_android.YoutubeDLException
+import com.yausername.ffmpeg.FFmpeg
 
 class MainActivity : AppCompatActivity(), DownloadService.DownloadServiceCallbacks {
 
@@ -140,7 +141,8 @@ class MainActivity : AppCompatActivity(), DownloadService.DownloadServiceCallbac
             }
             
             YoutubeDL.getInstance().init(this)
-            Log.d("MainActivity", "YoutubeDL initialized successfully")
+            FFmpeg.getInstance().init(this)
+            Log.d("MainActivity", "YoutubeDL and FFmpeg initialized successfully")
         } catch (e: YoutubeDLException) {
             Log.e("MainActivity", "Failed to initialize YoutubeDL", e)
             e.printStackTrace()
@@ -231,6 +233,10 @@ class MainActivity : AppCompatActivity(), DownloadService.DownloadServiceCallbac
                 clearAllJobs()
                 true
             }
+            R.id.action_update_ytdlp -> {
+                updateYtDlp()
+                true
+            }
             else -> super.onOptionsItemSelected(item)
         }
     }
@@ -293,7 +299,7 @@ class MainActivity : AppCompatActivity(), DownloadService.DownloadServiceCallbac
                     if (sharedText != null || sharedSubject != null) {
                         AlertDialog.Builder(this)
                             .setTitle(getString(R.string.dialog_unsupported_link))
-                            .setMessage(getString(R.string.dialog_youtube_only, sharedText ?: sharedSubject))
+                            .setMessage(getString(R.string.dialog_link_not_valid, sharedText ?: sharedSubject))
                             .setPositiveButton(getString(R.string.btn_ok), null)
                             .show()
                     }
@@ -925,6 +931,23 @@ class MainActivity : AppCompatActivity(), DownloadService.DownloadServiceCallbac
             stopAllDownloads()
         }
         
+        // Setup yt-dlp update section
+        val ytdlpVersionText = dialogView.findViewById<TextView>(R.id.ytdlpVersionText)
+        val updateYtdlpButton = dialogView.findViewById<com.google.android.material.button.MaterialButton>(R.id.updateYtdlpButton)
+        
+        // Show current yt-dlp version
+        val currentVersion = YoutubeDL.getInstance().versionName(this)
+        if (currentVersion != null) {
+            ytdlpVersionText.text = getString(R.string.settings_ytdlp_version, currentVersion)
+        } else {
+            ytdlpVersionText.text = getString(R.string.settings_ytdlp_version_unknown)
+        }
+        
+        // Setup update button
+        updateYtdlpButton.setOnClickListener {
+            updateYtDlp()
+        }
+        
         AlertDialog.Builder(this)
             .setTitle(getString(R.string.dialog_settings))
             .setView(dialogView)
@@ -1371,5 +1394,55 @@ class MainActivity : AppCompatActivity(), DownloadService.DownloadServiceCallbac
         } else {
             Toast.makeText(this, getString(R.string.toast_no_active_downloads), Toast.LENGTH_SHORT).show()
         }
+    }
+    
+    private fun updateYtDlp() {
+        Toast.makeText(this, getString(R.string.toast_ytdlp_updating), Toast.LENGTH_SHORT).show()
+        
+        Thread {
+            try {
+                val status = YoutubeDL.getInstance().updateYoutubeDL(
+                    this,
+                    YoutubeDL.UpdateChannel.STABLE
+                )
+                
+                runOnUiThread {
+                    when (status) {
+                        YoutubeDL.UpdateStatus.DONE -> {
+                            val newVersion = YoutubeDL.getInstance().versionName(this) ?: "unknown"
+                            Toast.makeText(
+                                this,
+                                getString(R.string.toast_ytdlp_updated, newVersion),
+                                Toast.LENGTH_LONG
+                            ).show()
+                        }
+                        YoutubeDL.UpdateStatus.ALREADY_UP_TO_DATE -> {
+                            val currentVersion = YoutubeDL.getInstance().versionName(this) ?: "unknown"
+                            Toast.makeText(
+                                this,
+                                getString(R.string.toast_ytdlp_up_to_date, currentVersion),
+                                Toast.LENGTH_LONG
+                            ).show()
+                        }
+                        else -> {
+                            Toast.makeText(
+                                this,
+                                getString(R.string.toast_ytdlp_update_failed, "Unknown status"),
+                                Toast.LENGTH_LONG
+                            ).show()
+                        }
+                    }
+                }
+            } catch (e: Exception) {
+                Log.e("MainActivity", "Failed to update yt-dlp", e)
+                runOnUiThread {
+                    Toast.makeText(
+                        this,
+                        getString(R.string.toast_ytdlp_update_failed, e.message ?: "Unknown error"),
+                        Toast.LENGTH_LONG
+                    ).show()
+                }
+            }
+        }.start()
     }
 }

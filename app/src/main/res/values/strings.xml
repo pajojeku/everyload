@@ -129,4 +129,17 @@
     <!-- Menu -->
     <string name="action_settings">Settings</string>
     <string name="action_clear_downloads">Clear all</string>
+    <string name="action_update_ytdlp">Update yt-dlp</string>
+    
+    <!-- yt-dlp update -->
+    <string name="settings_ytdlp_section">yt-dlp Engine</string>
+    <string name="settings_ytdlp_version">Version: %s</string>
+    <string name="settings_ytdlp_version_unknown">Version: unknown (built-in)</string>
+    <string name="settings_update_ytdlp">Update yt-dlp</string>
+    <string name="settings_ytdlp_info">Update yt-dlp to download from more sites like Reddit, TikTok, Instagram, etc.</string>
+    <string name="toast_ytdlp_updating">Updating yt-dlp…</string>
+    <string name="toast_ytdlp_updated">yt-dlp updated to %s</string>
+    <string name="toast_ytdlp_up_to_date">yt-dlp is already up to date (%s)</string>
+    <string name="toast_ytdlp_update_failed">yt-dlp update failed: %s</string>
+    <string name="dialog_link_not_valid">Received: %s\n\nThis doesn\'t appear to be a valid video URL.</string>
 </resources>
