@@ -36,10 +36,11 @@ import android.view.MenuItem
 import android.widget.LinearLayout
 import android.widget.ArrayAdapter
 import android.widget.Spinner
-import android.widget.Switch
-import android.widget.SeekBar
 import android.widget.TextView
 import androidx.appcompat.widget.Toolbar
+import com.google.android.material.slider.Slider
+import com.google.android.material.materialswitch.MaterialSwitch
+import com.google.android.material.textfield.TextInputEditText
 
 // Service imports
 import com.elteam.everyload.service.DownloadService
@@ -152,16 +153,16 @@ class MainActivity : AppCompatActivity(), DownloadService.DownloadServiceCallbac
         adapter = JobAdapter(jobs, { job -> handleJobClick(job) }) { saveJobsToPrefs() }
         recyclerView.adapter = adapter
 
-        val urlInput: EditText = findViewById(R.id.urlInput)
-        val downloadButton: Button = findViewById(R.id.downloadButton)
+        val urlInput: TextInputEditText = findViewById(R.id.urlInput)
+        val downloadButton: com.google.android.material.button.MaterialButton = findViewById(R.id.downloadButton)
 
         downloadButton.setOnClickListener {
             val url = urlInput.text.toString().trim()
             if (url.isNotBlank()) {
                 startYtdlpDownload(url)
-                urlInput.text.clear()
+                urlInput.text?.clear()
             } else {
-                Toast.makeText(this, "Please enter a URL", Toast.LENGTH_SHORT).show()
+                Toast.makeText(this, "Wklej link do pobrania", Toast.LENGTH_SHORT).show()
             }
         }
         
@@ -274,10 +275,10 @@ class MainActivity : AppCompatActivity(), DownloadService.DownloadServiceCallbac
                 if (url != null && (url.contains("youtube.com") || url.contains("youtu.be") || url.startsWith("http"))) {
                     Log.d("MainActivity", "Valid URL found: $url")
                     
-                    // Show debug dialog (remove this in production)
+                    // Show confirmation dialog
                     AlertDialog.Builder(this)
-                        .setTitle("DEBUG: Sharing Received")
-                        .setMessage("Received URL: $url")
+                        .setTitle("Link Shared")
+                        .setMessage("Do you want to download:\n$url")
                         .setPositiveButton("Download") { _, _ ->
                             processSharedUrl(url)
                         }
@@ -285,11 +286,11 @@ class MainActivity : AppCompatActivity(), DownloadService.DownloadServiceCallbac
                         .show()
                 } else {
                     Log.d("MainActivity", "No valid URL found in SEND intent")
-                    // Show what we did receive for debugging
+                    // Show error if we received something but it's not a valid URL
                     if (sharedText != null || sharedSubject != null) {
                         AlertDialog.Builder(this)
-                            .setTitle("DEBUG: Received non-URL content")
-                            .setMessage("Text: $sharedText\nSubject: $sharedSubject")
+                            .setTitle("Unsupported Link")
+                            .setMessage("Received: ${sharedText ?: sharedSubject}\n\nOnly YouTube links are supported.")
                             .setPositiveButton("OK", null)
                             .show()
                     }
@@ -334,11 +335,11 @@ class MainActivity : AppCompatActivity(), DownloadService.DownloadServiceCallbac
                 .setMessage("Czy chcesz pobrać całą playlistę? Możesz to zmienić w ustawieniach.")
                 .setPositiveButton("Tak, pobierz playlistę") { _, _ ->
                     startYtdlpDownload(url, forcePlaylist = true)
-                    urlInput.text.clear()
+                    urlInput.text?.clear()
                 }
                 .setNegativeButton("Tylko to wideo") { _, _ ->
                     startYtdlpDownload(url, forcePlaylist = false)
-                    urlInput.text.clear()
+                    urlInput.text?.clear()
                 }
                 .setNegativeButton("Anuluj") { _, _ ->
                     // Keep URL in field for manual download later
@@ -347,8 +348,8 @@ class MainActivity : AppCompatActivity(), DownloadService.DownloadServiceCallbac
         } else {
             // Auto-start download and show confirmation
             startYtdlpDownload(url)
-            urlInput.text.clear()
-            Toast.makeText(this, "Starting download from shared URL", Toast.LENGTH_SHORT).show()
+            urlInput.text?.clear()
+            Toast.makeText(this, "Pobieranie rozpoczęte", Toast.LENGTH_SHORT).show()
         }
     }
 
@@ -851,10 +852,10 @@ class MainActivity : AppCompatActivity(), DownloadService.DownloadServiceCallbac
         // Get UI elements
         val formatSpinner = dialogView.findViewById<Spinner>(R.id.formatSpinner)
         val qualitySpinner = dialogView.findViewById<Spinner>(R.id.qualitySpinner)
-        val attemptsSeekBar = dialogView.findViewById<SeekBar>(R.id.attemptsSeekBar)
+        val attemptsSlider = dialogView.findViewById<Slider>(R.id.attemptsSeekBar)
         val attemptsText = dialogView.findViewById<TextView>(R.id.attemptsText)
-        val playlistSwitch = dialogView.findViewById<Switch>(R.id.playlistSwitch)
-        val stopAllButton = dialogView.findViewById<Button>(R.id.stopAllButton)
+        val playlistSwitch = dialogView.findViewById<MaterialSwitch>(R.id.playlistSwitch)
+        val stopAllButton = dialogView.findViewById<com.google.android.material.button.MaterialButton>(R.id.stopAllButton)
         
         // Setup format spinner
         val formatAdapter = ArrayAdapter.createFromResource(
@@ -895,37 +896,26 @@ class MainActivity : AppCompatActivity(), DownloadService.DownloadServiceCallbac
             else -> 3
         })
         
-        // Setup attempts seekbar
-        attemptsSeekBar.max = 7 // 1-8 attempts
-        attemptsSeekBar.progress = getMaxAttempts() - 1
+        // Setup attempts slider (Material 3)
+        attemptsSlider.value = getMaxAttempts().toFloat()
         attemptsText.text = "Maksymalne próby: ${getMaxAttempts()}"
-        attemptsSeekBar.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
-            override fun onProgressChanged(seekBar: SeekBar?, progress: Int, fromUser: Boolean) {
-                attemptsText.text = "Maksymalne próby: ${progress + 1}"
-            }
-            override fun onStartTrackingTouch(seekBar: SeekBar?) {}
-            override fun onStopTrackingTouch(seekBar: SeekBar?) {}
-        })
+        attemptsSlider.addOnChangeListener { _, value, _ ->
+            attemptsText.text = "Maksymalne próby: ${value.toInt()}"
+        }
         
         // Setup playlist switch
         playlistSwitch.isChecked = getAllowPlaylists()
         
-        // Setup concurrent downloads seekbar (1-10 downloads)
-        val concurrentDownloadsSeekBar = dialogView.findViewById<SeekBar>(R.id.concurrentDownloadsSeekBar)
+        // Setup concurrent downloads slider (1-10 downloads)
+        val concurrentDownloadsSlider = dialogView.findViewById<Slider>(R.id.concurrentDownloadsSeekBar)
         val concurrentDownloadsText = dialogView.findViewById<TextView>(R.id.concurrentDownloadsText)
         
-        concurrentDownloadsSeekBar.max = 9 // 0-9 range = 1-10 downloads
-        concurrentDownloadsSeekBar.progress = getMaxConcurrentDownloads() - 1 // Convert to 0-based
-        concurrentDownloadsText.text = "Max concurrent downloads: ${getMaxConcurrentDownloads()}"
+        concurrentDownloadsSlider.value = getMaxConcurrentDownloads().toFloat()
+        concurrentDownloadsText.text = "Równoczesne pobierania: ${getMaxConcurrentDownloads()}"
         
-        concurrentDownloadsSeekBar.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
-            override fun onProgressChanged(seekBar: SeekBar?, progress: Int, fromUser: Boolean) {
-                val actualValue = progress + 1 // Convert back to 1-10 range
-                concurrentDownloadsText.text = "Max concurrent downloads: $actualValue"
-            }
-            override fun onStartTrackingTouch(seekBar: SeekBar?) {}
-            override fun onStopTrackingTouch(seekBar: SeekBar?) {}
-        })
+        concurrentDownloadsSlider.addOnChangeListener { _, value, _ ->
+            concurrentDownloadsText.text = "Równoczesne pobierania: ${value.toInt()}"
+        }
         
         // Setup stop all downloads button
         stopAllButton.setOnClickListener {
@@ -954,9 +944,9 @@ class MainActivity : AppCompatActivity(), DownloadService.DownloadServiceCallbac
                 }
                 editor.putString(KEY_QUALITY, selectedQuality)
                 
-                editor.putInt(KEY_MAX_ATTEMPTS, attemptsSeekBar.progress + 1)
+                editor.putInt(KEY_MAX_ATTEMPTS, attemptsSlider.value.toInt())
                 editor.putBoolean(KEY_ALLOW_PLAYLISTS, playlistSwitch.isChecked)
-                editor.putInt(KEY_MAX_CONCURRENT_DOWNLOADS, concurrentDownloadsSeekBar.progress + 1) // Convert back to 1-10 range
+                editor.putInt(KEY_MAX_CONCURRENT_DOWNLOADS, concurrentDownloadsSlider.value.toInt())
                 editor.apply()
                 
                 Toast.makeText(this, "Ustawienia zapisane", Toast.LENGTH_SHORT).show()
