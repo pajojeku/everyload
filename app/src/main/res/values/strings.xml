@@ -1,12 +1,121 @@
 <resources>
     <string name="app_name">Everyload</string>
-    <string name="action_settings">Settings</string>
+    
+    <!-- Main UI -->
+    <string name="hint_paste_link">Paste video link…</string>
+    <string name="btn_download">Download</string>
+    <string name="section_downloads">Downloads</string>
+    <string name="empty_state_title">No downloads</string>
+    <string name="empty_state_description">Paste a link or share a video\nfrom YouTube to start</string>
+    
+    <!-- Status labels -->
+    <string name="status_saved">Saved</string>
+    <string name="status_downloading">Downloading…</string>
+    <string name="status_ready">Ready</string>
+    <string name="status_error">Error</string>
+    <string name="status_queued">Queued</string>
+    <string name="status_processing">Processing…</string>
+    <string name="status_extracting">Extracting playlist…</string>
+    <string name="status_stopped">Stopped</string>
+    
+    <!-- Toasts & Messages -->
+    <string name="toast_paste_link">Please paste a link</string>
+    <string name="toast_url_received">URL received from sharing</string>
+    <string name="toast_download_started">Download started</string>
+    <string name="toast_added_to_queue">Added to queue</string>
+    <string name="toast_invalid_url">Invalid URL: %s</string>
+    <string name="toast_downloaded">Downloaded: %s</string>
+    <string name="toast_download_error">Download error</string>
+    <string name="toast_download_failed">Download failed: %s</string>
+    <string name="toast_deleted">Deleted: %s</string>
+    <string name="toast_settings_saved">Settings saved</string>
+    <string name="toast_cannot_open_file">Cannot open file: %s</string>
+    <string name="toast_deleted_all">Deleted all jobs (%d)</string>
+    <string name="toast_no_jobs_to_delete">No jobs to delete</string>
+    <string name="toast_stopped_jobs">Stopped %d jobs</string>
+    <string name="toast_no_active_downloads">No active downloads to stop</string>
+    <string name="toast_permissions_denied">Some permissions were denied. App may not work properly.</string>
+    <string name="toast_notification_denied">Notification permission denied. Background downloads won\'t show progress.</string>
+    <string name="toast_no_videos_in_playlist">No videos found in playlist</string>
+    <string name="toast_found_videos">Found %d videos in playlist</string>
+    
+    <!-- Errors -->
+    <string name="error_cannot_access_directory">Cannot access directory</string>
+    <string name="error_cannot_create_directory">Cannot create directory</string>
+    <string name="error_directory_not_writable">Directory not writable</string>
+    <string name="error_ytdlp_unavailable">YoutubeDL unavailable</string>
+    <string name="error_playlist_extraction">Playlist info error: %s</string>
+    <string name="error_playlist_analysis">Playlist analysis error: %s</string>
+    <string name="error_unexpected">Unexpected error after %d attempts: %s</string>
+    <string name="error_unexpected_short">Unexpected error after %d attempts</string>
+    <string name="error_youtube_blocked">YouTube blocked downloading after %d attempts. Try again in a few minutes.</string>
+    <string name="error_video_unavailable">Video unavailable</string>
+    <string name="error_private_video">Private video</string>
+    <string name="error_no_formats">No video formats available</string>
+    <string name="error_network">Network error after %d attempts</string>
+    <string name="error_access_denied">Access denied - video may be blocked</string>
+    <string name="error_video_not_found">Video not found</string>
+    <string name="error_connection">Connection error after %d attempts</string>
+    <string name="error_verification_required">YouTube requires additional verification after %d attempts.</string>
+    <string name="error_download_failed">Download error after %d attempts: %s</string>
+    <string name="error_cannot_create_download_dir">Cannot create download directory</string>
+    <string name="error_directory_not_accessible">Download directory is not accessible</string>
+    <string name="error_cannot_access_download_dir">Cannot access download directory</string>
+    <string name="error_file_access">File access error: %s</string>
+    <string name="error_file_not_found">Downloaded file not found</string>
+    <string name="error_no_files_in_directory">No files in download directory</string>
+    
+    <!-- Dialogs -->
+    <string name="dialog_error">Error</string>
+    <string name="dialog_link_shared">Link Shared</string>
+    <string name="dialog_download_question">Do you want to download:\n%s</string>
+    <string name="dialog_unsupported_link">Unsupported Link</string>
+    <string name="dialog_youtube_only">Received: %s\n\nOnly YouTube links are supported.</string>
+    <string name="dialog_playlist_detected">Playlist Detected</string>
+    <string name="dialog_playlist_question">Do you want to download the entire playlist? You can change this in settings.</string>
+    <string name="btn_download_playlist">Yes, download playlist</string>
+    <string name="btn_this_video_only">Only this video</string>
+    <string name="dialog_delete_title">Delete download?</string>
+    <string name="dialog_delete_message">Are you sure you want to delete \"%s\"?\n\nThis will also remove the file from your device.</string>
+    <string name="btn_delete">Delete</string>
+    <string name="btn_cancel">Cancel</string>
+    <string name="btn_ok">OK</string>
+    <string name="btn_save">Save</string>
+    <string name="btn_yes">Yes</string>
+    <string name="dialog_clear_list">Clear list</string>
+    <string name="dialog_clear_message">Do you want to delete all jobs (%d)? This will also stop active downloads.</string>
+    <string name="dialog_stop_downloads">Stop downloads</string>
+    <string name="dialog_stop_message">Do you want to stop all active downloads? (%d jobs)</string>
+    <string name="dialog_settings">Settings</string>
+    
+    <!-- Settings -->
+    <string name="settings_format">Download format</string>
+    <string name="settings_quality">Video quality</string>
+    <string name="settings_max_attempts">Max attempts: %d</string>
+    <string name="settings_playlist">Download playlists</string>
+    <string name="settings_playlist_desc">Automatically detect playlists</string>
+    <string name="settings_concurrent">Concurrent downloads: %d</string>
+    <string name="settings_concurrent_desc">Maximum simultaneous downloads</string>
+    <string name="settings_stop_all">Stop all downloads</string>
+    <string name="settings_ffmpeg_info">ℹ️ MP3 downloads use format conversion for best compatibility.</string>
+    
+    <!-- Info messages -->
+    <string name="info_extracting_playlist">Fetching playlist info…</string>
+    <string name="info_connecting_playlist">Connecting to playlist…</string>
+    <string name="info_analyzing_playlist">Analyzing playlist: %d%%</string>
+    <string name="info_queued_position">In queue (%d/%d)</string>
+    <string name="info_attempt_connecting">Attempt %d/%d - Connecting…</string>
+    <string name="info_attempt_downloading">Attempt %d/%d - Downloading: %d%%</string>
+    <string name="info_download_completed">Download completed (attempt %d/%d)</string>
+    <string name="info_attempt_failed_retry">Attempt %d failed. Retrying in %ds…</string>
+    <string name="info_unexpected_error_retry">Unexpected error in attempt %d. Retrying…</string>
+    <string name="info_starting_download">Starting download…</string>
     
     <!-- Format options -->
     <string-array name="format_options">
-        <item>MP3 (tylko audio)</item>
-        <item>MP4 (wideo)</item>
-        <item>Najlepsza jakość</item>
+        <item>MP3 (audio only)</item>
+        <item>MP4 (video)</item>
+        <item>Best quality</item>
     </string-array>
     
     <!-- Quality options -->
@@ -14,6 +123,10 @@
         <item>480p</item>
         <item>720p</item>
         <item>1080p</item>
-        <item>Najlepsza dostępna</item>
+        <item>Best available</item>
     </string-array>
+    
+    <!-- Menu -->
+    <string name="action_settings">Settings</string>
+    <string name="action_clear_downloads">Clear all</string>
 </resources>

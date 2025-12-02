@@ -152,6 +152,9 @@ class MainActivity : AppCompatActivity(), DownloadService.DownloadServiceCallbac
 
         adapter = JobAdapter(jobs, { job -> handleJobClick(job) }) { saveJobsToPrefs() }
         recyclerView.adapter = adapter
+        
+        // Setup swipe-to-delete
+        setupSwipeToDelete(recyclerView)
 
         val urlInput: TextInputEditText = findViewById(R.id.urlInput)
         val downloadButton: com.google.android.material.button.MaterialButton = findViewById(R.id.downloadButton)
@@ -162,7 +165,7 @@ class MainActivity : AppCompatActivity(), DownloadService.DownloadServiceCallbac
                 startYtdlpDownload(url)
                 urlInput.text?.clear()
             } else {
-                Toast.makeText(this, "Wklej link do pobrania", Toast.LENGTH_SHORT).show()
+                Toast.makeText(this, getString(R.string.toast_paste_link), Toast.LENGTH_SHORT).show()
             }
         }
         
@@ -277,21 +280,21 @@ class MainActivity : AppCompatActivity(), DownloadService.DownloadServiceCallbac
                     
                     // Show confirmation dialog
                     AlertDialog.Builder(this)
-                        .setTitle("Link Shared")
-                        .setMessage("Do you want to download:\n$url")
-                        .setPositiveButton("Download") { _, _ ->
+                        .setTitle(getString(R.string.dialog_link_shared))
+                        .setMessage(getString(R.string.dialog_download_question, url))
+                        .setPositiveButton(getString(R.string.btn_download)) { _, _ ->
                             processSharedUrl(url)
                         }
-                        .setNegativeButton("Cancel", null)
+                        .setNegativeButton(getString(R.string.btn_cancel), null)
                         .show()
                 } else {
                     Log.d("MainActivity", "No valid URL found in SEND intent")
                     // Show error if we received something but it's not a valid URL
                     if (sharedText != null || sharedSubject != null) {
                         AlertDialog.Builder(this)
-                            .setTitle("Unsupported Link")
-                            .setMessage("Received: ${sharedText ?: sharedSubject}\n\nOnly YouTube links are supported.")
-                            .setPositiveButton("OK", null)
+                            .setTitle(getString(R.string.dialog_unsupported_link))
+                            .setMessage(getString(R.string.dialog_youtube_only, sharedText ?: sharedSubject))
+                            .setPositiveButton(getString(R.string.btn_ok), null)
                             .show()
                     }
                 }
@@ -319,7 +322,7 @@ class MainActivity : AppCompatActivity(), DownloadService.DownloadServiceCallbac
         urlInput.setText(url)
         
         // Give visual feedback that sharing was received
-        Toast.makeText(this, "URL received from sharing", Toast.LENGTH_SHORT).show()
+        Toast.makeText(this, getString(R.string.toast_url_received), Toast.LENGTH_SHORT).show()
 
         // Check if it's a playlist and user allows playlists
         val isPlaylist = url.contains("list=") || 
@@ -331,17 +334,17 @@ class MainActivity : AppCompatActivity(), DownloadService.DownloadServiceCallbac
         if (isPlaylist && !getAllowPlaylists()) {
             // Ask user if they want to download playlist
             AlertDialog.Builder(this)
-                .setTitle("Wykryto playlistę")
-                .setMessage("Czy chcesz pobrać całą playlistę? Możesz to zmienić w ustawieniach.")
-                .setPositiveButton("Tak, pobierz playlistę") { _, _ ->
+                .setTitle(getString(R.string.dialog_playlist_detected))
+                .setMessage(getString(R.string.dialog_playlist_question))
+                .setPositiveButton(getString(R.string.btn_download_playlist)) { _, _ ->
                     startYtdlpDownload(url, forcePlaylist = true)
                     urlInput.text?.clear()
                 }
-                .setNegativeButton("Tylko to wideo") { _, _ ->
+                .setNegativeButton(getString(R.string.btn_this_video_only)) { _, _ ->
                     startYtdlpDownload(url, forcePlaylist = false)
                     urlInput.text?.clear()
                 }
-                .setNegativeButton("Anuluj") { _, _ ->
+                .setNegativeButton(getString(R.string.btn_cancel)) { _, _ ->
                     // Keep URL in field for manual download later
                 }
                 .show()
@@ -349,15 +352,15 @@ class MainActivity : AppCompatActivity(), DownloadService.DownloadServiceCallbac
             // Auto-start download and show confirmation
             startYtdlpDownload(url)
             urlInput.text?.clear()
-            Toast.makeText(this, "Pobieranie rozpoczęte", Toast.LENGTH_SHORT).show()
+            Toast.makeText(this, getString(R.string.toast_download_started), Toast.LENGTH_SHORT).show()
         }
     }
 
     private fun showErrorDialog(message: String) {
         val builder = AlertDialog.Builder(this)
-        builder.setTitle("Błąd")
+        builder.setTitle(getString(R.string.dialog_error))
         builder.setMessage(message)
-        builder.setPositiveButton("OK") { dialog, _ -> dialog.dismiss() }
+        builder.setPositiveButton(getString(R.string.btn_ok)) { dialog, _ -> dialog.dismiss() }
         builder.setCancelable(true)
         builder.show()
     }
@@ -396,12 +399,12 @@ class MainActivity : AppCompatActivity(), DownloadService.DownloadServiceCallbac
                     grantResults[index] != PackageManager.PERMISSION_GRANTED 
                 }
                 if (deniedPermissions.isNotEmpty()) {
-                    Toast.makeText(this, "Some permissions were denied. App may not work properly.", Toast.LENGTH_LONG).show()
+                    Toast.makeText(this, getString(R.string.toast_permissions_denied), Toast.LENGTH_LONG).show()
                 }
             }
             NOTIFICATION_PERMISSION_REQUEST_CODE -> {
                 if (grantResults.isNotEmpty() && grantResults[0] != PackageManager.PERMISSION_GRANTED) {
-                    Toast.makeText(this, "Notification permission denied. Background downloads won't show progress.", Toast.LENGTH_LONG).show()
+                    Toast.makeText(this, getString(R.string.toast_notification_denied), Toast.LENGTH_LONG).show()
                 }
             }
         }
@@ -420,7 +423,7 @@ class MainActivity : AppCompatActivity(), DownloadService.DownloadServiceCallbac
         // Validate URL first
         val trimmedUrl = url.trim()
         if (trimmedUrl.isBlank() || (!trimmedUrl.startsWith("http://") && !trimmedUrl.startsWith("https://"))) {
-            Toast.makeText(this, "Nieprawidłowy URL: $trimmedUrl", Toast.LENGTH_LONG).show()
+            Toast.makeText(this, getString(R.string.toast_invalid_url, trimmedUrl), Toast.LENGTH_LONG).show()
             return
         }
         
@@ -442,7 +445,7 @@ class MainActivity : AppCompatActivity(), DownloadService.DownloadServiceCallbac
             adapter.upsert(entry)
             
             runOnUiThread {
-                Toast.makeText(this, "Dodano do kolejki", Toast.LENGTH_SHORT).show()
+                Toast.makeText(this, getString(R.string.toast_added_to_queue), Toast.LENGTH_SHORT).show()
             }
             
             // Add to download queue for concurrent processing
@@ -459,7 +462,7 @@ class MainActivity : AppCompatActivity(), DownloadService.DownloadServiceCallbac
     private fun extractPlaylistInfo(playlistUrl: String) {
         val extractJobId = "extract_${System.currentTimeMillis()}"
         val extractEntry = JobEntry(jobId = extractJobId, url = playlistUrl, status = "extracting")
-        extractEntry.info = "Pobieranie informacji o playliście..."
+        extractEntry.info = getString(R.string.info_extracting_playlist)
         jobs.add(0, extractEntry)
         adapter.upsert(extractEntry)
         
@@ -473,9 +476,9 @@ class MainActivity : AppCompatActivity(), DownloadService.DownloadServiceCallbac
                 if (externalDir == null) {
                     runOnUiThread {
                         extractEntry.status = "error"
-                        extractEntry.info = "Nie można uzyskać dostępu do katalogu"
+                        extractEntry.info = getString(R.string.error_cannot_access_directory)
                         adapter.upsert(extractEntry)
-                        Toast.makeText(this@MainActivity, "Błąd: Nie można uzyskać dostępu do katalogu", Toast.LENGTH_LONG).show()
+                        Toast.makeText(this@MainActivity, getString(R.string.error_cannot_access_directory), Toast.LENGTH_LONG).show()
                     }
                     return@Thread
                 }
@@ -486,9 +489,9 @@ class MainActivity : AppCompatActivity(), DownloadService.DownloadServiceCallbac
                 if (!youtubeDLDir.exists() && !youtubeDLDir.mkdirs()) {
                     runOnUiThread {
                         extractEntry.status = "error"
-                        extractEntry.info = "Nie można utworzyć katalogu"
+                        extractEntry.info = getString(R.string.error_cannot_create_directory)
                         adapter.upsert(extractEntry)
-                        Toast.makeText(this@MainActivity, "Błąd: Nie można utworzyć katalogu", Toast.LENGTH_LONG).show()
+                        Toast.makeText(this@MainActivity, getString(R.string.error_cannot_create_directory), Toast.LENGTH_LONG).show()
                     }
                     return@Thread
                 }
@@ -497,9 +500,9 @@ class MainActivity : AppCompatActivity(), DownloadService.DownloadServiceCallbac
                 if (!youtubeDLDir.isDirectory() || !youtubeDLDir.canWrite()) {
                     runOnUiThread {
                         extractEntry.status = "error"
-                        extractEntry.info = "Katalog niedostępny do zapisu"
+                        extractEntry.info = getString(R.string.error_directory_not_writable)
                         adapter.upsert(extractEntry)
-                        Toast.makeText(this@MainActivity, "Błąd: Katalog niedostępny do zapisu", Toast.LENGTH_LONG).show()
+                        Toast.makeText(this@MainActivity, getString(R.string.error_directory_not_writable), Toast.LENGTH_LONG).show()
                     }
                     return@Thread
                 }
@@ -512,7 +515,7 @@ class MainActivity : AppCompatActivity(), DownloadService.DownloadServiceCallbac
                 }
                 
                 runOnUiThread {
-                    extractEntry.info = "Łączenie z playlistą..."
+                    extractEntry.info = getString(R.string.info_connecting_playlist)
                     adapter.upsert(extractEntry)
                 }
                 
@@ -521,9 +524,9 @@ class MainActivity : AppCompatActivity(), DownloadService.DownloadServiceCallbac
                     Log.e("MainActivity", "YoutubeDL instance is null for playlist extraction")
                     runOnUiThread {
                         extractEntry.status = "error"
-                        extractEntry.info = "YoutubeDL niedostępny"
+                        extractEntry.info = getString(R.string.error_ytdlp_unavailable)
                         adapter.upsert(extractEntry)
-                        Toast.makeText(this@MainActivity, "Błąd: YoutubeDL niedostępny", Toast.LENGTH_LONG).show()
+                        Toast.makeText(this@MainActivity, getString(R.string.error_ytdlp_unavailable), Toast.LENGTH_LONG).show()
                     }
                     return@Thread
                 }
@@ -536,7 +539,7 @@ class MainActivity : AppCompatActivity(), DownloadService.DownloadServiceCallbac
                         output.appendLine(line)
                     }
                     runOnUiThread {
-                        extractEntry.info = "Analizowanie playlisty: ${progress.toInt()}%"
+                        extractEntry.info = getString(R.string.info_analyzing_playlist, progress.toInt())
                         adapter.upsert(extractEntry)
                     }
                 }
@@ -550,11 +553,11 @@ class MainActivity : AppCompatActivity(), DownloadService.DownloadServiceCallbac
                     adapter.notifyDataSetChanged()
                     
                     if (lines.isEmpty()) {
-                        Toast.makeText(this@MainActivity, "Nie znaleziono filmów w playliście", Toast.LENGTH_LONG).show()
+                        Toast.makeText(this@MainActivity, getString(R.string.toast_no_videos_in_playlist), Toast.LENGTH_LONG).show()
                         return@runOnUiThread
                     }
                     
-                    val message = "Znaleziono ${lines.size} filmów w playliście"
+                    val message = getString(R.string.toast_found_videos, lines.size)
                     Toast.makeText(this@MainActivity, message, Toast.LENGTH_SHORT).show()
                     
                     // Create separate jobs for each video
@@ -572,7 +575,7 @@ class MainActivity : AppCompatActivity(), DownloadService.DownloadServiceCallbac
                                 status = "queued",
                                 title = title.ifEmpty { "Video ${index + 1}" }
                             )
-                            videoEntry.info = "W kolejce (${index + 1}/${lines.size})"
+                            videoEntry.info = getString(R.string.info_queued_position, index + 1, lines.size)
                             
                             jobs.add(0, videoEntry)
                             adapter.upsert(videoEntry)
@@ -595,9 +598,9 @@ class MainActivity : AppCompatActivity(), DownloadService.DownloadServiceCallbac
                 Log.e("MainActivity", "Stack trace:", e)
                 runOnUiThread {
                     extractEntry.status = "error"
-                    extractEntry.info = "Błąd pobierania informacji o playliście: ${e.message}"
+                    extractEntry.info = getString(R.string.error_playlist_extraction, e.message ?: "")
                     adapter.upsert(extractEntry)
-                    Toast.makeText(this@MainActivity, "Błąd analizy playlisty: ${e.message}", Toast.LENGTH_LONG).show()
+                    Toast.makeText(this@MainActivity, getString(R.string.error_playlist_analysis, e.message ?: ""), Toast.LENGTH_LONG).show()
                 }
             }
         }.start()
@@ -641,9 +644,9 @@ class MainActivity : AppCompatActivity(), DownloadService.DownloadServiceCallbac
             if (!youtubeDLDir.mkdirs()) {
                 runOnUiThread {
                     entry.status = "error"
-                    entry.info = "Nie można utworzyć katalogu pobierania"
+                    entry.info = getString(R.string.error_cannot_create_download_dir)
                     adapter.upsert(entry)
-                    Toast.makeText(this@MainActivity, "Błąd: Nie można utworzyć katalogu", Toast.LENGTH_LONG).show()
+                    Toast.makeText(this@MainActivity, getString(R.string.error_cannot_create_directory), Toast.LENGTH_LONG).show()
                 }
                 return
             }
@@ -653,9 +656,9 @@ class MainActivity : AppCompatActivity(), DownloadService.DownloadServiceCallbac
         if (!youtubeDLDir.exists() || !youtubeDLDir.isDirectory()) {
             runOnUiThread {
                 entry.status = "error"
-                entry.info = "Download directory is not accessible"
+                entry.info = getString(R.string.error_directory_not_accessible)
                 adapter.upsert(entry)
-                Toast.makeText(this@MainActivity, "Error: Cannot access download directory", Toast.LENGTH_LONG).show()
+                Toast.makeText(this@MainActivity, getString(R.string.error_cannot_access_download_dir), Toast.LENGTH_LONG).show()
             }
             return
         }
@@ -716,7 +719,7 @@ class MainActivity : AppCompatActivity(), DownloadService.DownloadServiceCallbac
                     
                     // Update status with attempt info
                     runOnUiThread {
-                        entry.info = "Próba $currentAttempt/$maxAttempts - Łączenie..."
+                        entry.info = getString(R.string.info_attempt_connecting, currentAttempt, maxAttempts)
                         adapter.upsert(entry)
                     }
                     
@@ -725,7 +728,7 @@ class MainActivity : AppCompatActivity(), DownloadService.DownloadServiceCallbac
                     youtubeDLInstance.execute(request) { progress, eta, line ->
                         Log.d("YouTubeDL", "$progress% (ETA $eta seconds) - $line")
                         runOnUiThread {
-                            entry.info = "Próba $currentAttempt/$maxAttempts - Pobieranie: ${progress.toInt()}%"
+                            entry.info = getString(R.string.info_attempt_downloading, currentAttempt, maxAttempts, progress.toInt())
                             adapter.upsert(entry)
                         }
                     }
@@ -733,7 +736,7 @@ class MainActivity : AppCompatActivity(), DownloadService.DownloadServiceCallbac
                     // Download completed successfully
                     runOnUiThread {
                         entry.status = "finished"
-                        entry.info = "Pobieranie zakończone (próba $currentAttempt/$maxAttempts)"
+                        entry.info = getString(R.string.info_download_completed, currentAttempt, maxAttempts)
                         
                         // Find the downloaded file
                         val downloadedFiles = youtubeDLDir.listFiles()?.filter { 
@@ -753,25 +756,25 @@ class MainActivity : AppCompatActivity(), DownloadService.DownloadServiceCallbac
                                 } catch (e: Exception) {
                                     Log.e("YouTubeDL", "Failed to create file URI", e)
                                     entry.status = "error"
-                                    entry.info = "Błąd dostępu do pliku: ${e.message}"
+                                    entry.info = getString(R.string.error_file_access, e.message ?: "")
                                 }
                             } else {
                                 Log.w("YouTubeDL", "No downloaded file found in directory")
                                 entry.status = "error"
-                                entry.info = "Nie znaleziono pobranego pliku"
+                                entry.info = getString(R.string.error_file_not_found)
                             }
                         } else {
                             Log.w("YouTubeDL", "No files found in download directory")
                             entry.status = "error"
-                            entry.info = "Brak plików w katalogu pobierania"
+                            entry.info = getString(R.string.error_no_files_in_directory)
                         }
                         
                         adapter.upsert(entry)
-                        val downloadedFileName = downloadedFiles?.firstOrNull()?.name ?: "plik"
+                        val downloadedFileName = downloadedFiles?.firstOrNull()?.name ?: "file"
                         if (entry.status == "downloaded") {
-                            Toast.makeText(this@MainActivity, "Pobrano: $downloadedFileName", Toast.LENGTH_LONG).show()
+                            Toast.makeText(this@MainActivity, getString(R.string.toast_downloaded, downloadedFileName), Toast.LENGTH_LONG).show()
                         } else {
-                            Toast.makeText(this@MainActivity, "Błąd pobierania", Toast.LENGTH_LONG).show()
+                            Toast.makeText(this@MainActivity, getString(R.string.toast_download_error), Toast.LENGTH_LONG).show()
                         }
                     }
                     
@@ -786,7 +789,7 @@ class MainActivity : AppCompatActivity(), DownloadService.DownloadServiceCallbac
                         // Not the last attempt, show retry info
                         runOnUiThread {
                             val retryDelay = currentAttempt * 2 // Increasing delay: 2, 4, 6 seconds
-                            entry.info = "Próba $currentAttempt nieudana. Ponowienie za ${retryDelay}s..."
+                            entry.info = getString(R.string.info_attempt_failed_retry, currentAttempt, retryDelay)
                             adapter.upsert(entry)
                         }
                         
@@ -802,17 +805,17 @@ class MainActivity : AppCompatActivity(), DownloadService.DownloadServiceCallbac
                             // Parse common error messages
                             val userFriendlyError = when {
                                 errorMsg.contains("NoneType") || errorMsg.contains("Signature solving failed") || errorMsg.contains("challenge solving failed") -> 
-                                    "YouTube zablokował pobieranie po $maxAttempts próbach. Spróbuj ponownie za kilka minut."
-                                errorMsg.contains("Video unavailable") -> "Wideo niedostępne"
-                                errorMsg.contains("Private video") -> "Wideo prywatne"
-                                errorMsg.contains("No video formats") -> "Brak dostępnych formatów wideo"
-                                errorMsg.contains("network") || errorMsg.contains("timeout") -> "Błąd sieci po $maxAttempts próbach"
-                                errorMsg.contains("403") -> "Dostęp zabroniony - wideo może być zablokowane"
-                                errorMsg.contains("404") -> "Wideo nie znalezione"
-                                errorMsg.contains("IncompleteRead") -> "Błąd połączenia z YouTube po $maxAttempts próbach"
+                                    getString(R.string.error_youtube_blocked, maxAttempts)
+                                errorMsg.contains("Video unavailable") -> getString(R.string.error_video_unavailable)
+                                errorMsg.contains("Private video") -> getString(R.string.error_private_video)
+                                errorMsg.contains("No video formats") -> getString(R.string.error_no_formats)
+                                errorMsg.contains("network") || errorMsg.contains("timeout") -> getString(R.string.error_network, maxAttempts)
+                                errorMsg.contains("403") -> getString(R.string.error_access_denied)
+                                errorMsg.contains("404") -> getString(R.string.error_video_not_found)
+                                errorMsg.contains("IncompleteRead") -> getString(R.string.error_connection, maxAttempts)
                                 errorMsg.contains("JS challenge") || errorMsg.contains("JavaScript runtime") -> 
-                                    "YouTube wymaga dodatkowej weryfikacji po $maxAttempts próbach."
-                                else -> "Błąd pobierania po $maxAttempts próbach: ${errorMsg.take(100)}"
+                                    getString(R.string.error_verification_required, maxAttempts)
+                                else -> getString(R.string.error_download_failed, maxAttempts, errorMsg.take(100))
                             }
                             
                             entry.info = userFriendlyError
@@ -826,7 +829,7 @@ class MainActivity : AppCompatActivity(), DownloadService.DownloadServiceCallbac
                     
                     if (currentAttempt < maxAttempts) {
                         runOnUiThread {
-                            entry.info = "Nieoczekiwany błąd w próbie $currentAttempt. Ponowienie..."
+                            entry.info = getString(R.string.info_unexpected_error_retry, currentAttempt)
                             adapter.upsert(entry)
                         }
                         Thread.sleep(2000) // 2 second delay
@@ -835,9 +838,9 @@ class MainActivity : AppCompatActivity(), DownloadService.DownloadServiceCallbac
                     } else {
                         runOnUiThread {
                             entry.status = "error"
-                            entry.info = "Nieoczekiwany błąd po $maxAttempts próbach: ${e.message}"
+                            entry.info = getString(R.string.error_unexpected, maxAttempts, e.message ?: "")
                             adapter.upsert(entry)
-                            Toast.makeText(this@MainActivity, "Nieoczekiwany błąd po $maxAttempts próbach", Toast.LENGTH_LONG).show()
+                            Toast.makeText(this@MainActivity, getString(R.string.error_unexpected_short, maxAttempts), Toast.LENGTH_LONG).show()
                         }
                         break
                     }
@@ -876,7 +879,7 @@ class MainActivity : AppCompatActivity(), DownloadService.DownloadServiceCallbac
         if (ffmpegUnavailable) {
             val warningText = dialogView.findViewById<TextView>(R.id.ffmpegWarning)
             warningText?.let {
-                it.text = "ℹ️ MP3 downloads use format conversion for best compatibility."
+                it.text = getString(R.string.settings_ffmpeg_info)
                 it.visibility = View.VISIBLE
             }
         }
@@ -898,9 +901,9 @@ class MainActivity : AppCompatActivity(), DownloadService.DownloadServiceCallbac
         
         // Setup attempts slider (Material 3)
         attemptsSlider.value = getMaxAttempts().toFloat()
-        attemptsText.text = "Maksymalne próby: ${getMaxAttempts()}"
+        attemptsText.text = getString(R.string.settings_max_attempts, getMaxAttempts())
         attemptsSlider.addOnChangeListener { _, value, _ ->
-            attemptsText.text = "Maksymalne próby: ${value.toInt()}"
+            attemptsText.text = getString(R.string.settings_max_attempts, value.toInt())
         }
         
         // Setup playlist switch
@@ -911,10 +914,10 @@ class MainActivity : AppCompatActivity(), DownloadService.DownloadServiceCallbac
         val concurrentDownloadsText = dialogView.findViewById<TextView>(R.id.concurrentDownloadsText)
         
         concurrentDownloadsSlider.value = getMaxConcurrentDownloads().toFloat()
-        concurrentDownloadsText.text = "Równoczesne pobierania: ${getMaxConcurrentDownloads()}"
+        concurrentDownloadsText.text = getString(R.string.settings_concurrent, getMaxConcurrentDownloads())
         
         concurrentDownloadsSlider.addOnChangeListener { _, value, _ ->
-            concurrentDownloadsText.text = "Równoczesne pobierania: ${value.toInt()}"
+            concurrentDownloadsText.text = getString(R.string.settings_concurrent, value.toInt())
         }
         
         // Setup stop all downloads button
@@ -923,9 +926,9 @@ class MainActivity : AppCompatActivity(), DownloadService.DownloadServiceCallbac
         }
         
         AlertDialog.Builder(this)
-            .setTitle("Ustawienia")
+            .setTitle(getString(R.string.dialog_settings))
             .setView(dialogView)
-            .setPositiveButton("Zapisz") { _, _ ->
+            .setPositiveButton(getString(R.string.btn_save)) { _, _ ->
                 // Save settings
                 val editor = settings.edit()
                 
@@ -949,9 +952,9 @@ class MainActivity : AppCompatActivity(), DownloadService.DownloadServiceCallbac
                 editor.putInt(KEY_MAX_CONCURRENT_DOWNLOADS, concurrentDownloadsSlider.value.toInt())
                 editor.apply()
                 
-                Toast.makeText(this, "Ustawienia zapisane", Toast.LENGTH_SHORT).show()
+                Toast.makeText(this, getString(R.string.toast_settings_saved), Toast.LENGTH_SHORT).show()
             }
-            .setNegativeButton("Anuluj", null)
+            .setNegativeButton(getString(R.string.btn_cancel), null)
             .show()
     }
     
@@ -979,7 +982,7 @@ class MainActivity : AppCompatActivity(), DownloadService.DownloadServiceCallbac
     override fun onDownloadFailed(job: JobEntry, error: String) {
         runOnUiThread {
             adapter.upsert(job)
-            Toast.makeText(this, "Download failed: ${job.title ?: job.jobId}", Toast.LENGTH_SHORT).show()
+            Toast.makeText(this, getString(R.string.toast_download_failed, job.title ?: job.jobId), Toast.LENGTH_SHORT).show()
             
             // Decrease active count and process queue
             synchronized(downloadQueue) {
@@ -998,7 +1001,7 @@ class MainActivity : AppCompatActivity(), DownloadService.DownloadServiceCallbac
                 activeDownloadCount++
                 
                 runOnUiThread {
-                    nextJob.info = "Starting download..."
+                    nextJob.info = getString(R.string.info_starting_download)
                     adapter.upsert(nextJob)
                 }
                 
@@ -1006,6 +1009,195 @@ class MainActivity : AppCompatActivity(), DownloadService.DownloadServiceCallbac
                 performSingleDownload(nextJob)
             }
         }
+    }
+    
+    private fun setupSwipeToDelete(recyclerView: RecyclerView) {
+        val swipeCallback = object : ItemTouchHelper.SimpleCallback(0, ItemTouchHelper.LEFT or ItemTouchHelper.RIGHT) {
+            override fun onMove(
+                recyclerView: RecyclerView,
+                viewHolder: RecyclerView.ViewHolder,
+                target: RecyclerView.ViewHolder
+            ): Boolean = false
+
+            override fun onSwiped(viewHolder: RecyclerView.ViewHolder, direction: Int) {
+                val position = viewHolder.adapterPosition
+                if (position < 0 || position >= jobs.size) return
+                
+                val job = jobs[position]
+                
+                // Show confirmation dialog
+                AlertDialog.Builder(this@MainActivity)
+                    .setTitle(getString(R.string.dialog_delete_title))
+                    .setMessage(getString(R.string.dialog_delete_message, job.title ?: job.jobId))
+                    .setPositiveButton(getString(R.string.btn_delete)) { _, _ ->
+                        deleteJobAndFile(job, position)
+                    }
+                    .setNegativeButton(getString(R.string.btn_cancel)) { _, _ ->
+                        // Restore the item in the list
+                        adapter.notifyItemChanged(position)
+                    }
+                    .setOnCancelListener {
+                        // Restore the item if dialog is dismissed
+                        adapter.notifyItemChanged(position)
+                    }
+                    .show()
+            }
+            
+            override fun onChildDraw(
+                c: android.graphics.Canvas,
+                recyclerView: RecyclerView,
+                viewHolder: RecyclerView.ViewHolder,
+                dX: Float,
+                dY: Float,
+                actionState: Int,
+                isCurrentlyActive: Boolean
+            ) {
+                val itemView = viewHolder.itemView
+                val iconMargin = (itemView.height - 48) / 2  // 48dp icon with margin
+                val iconSize = 48  // dp converted to pixels below
+                val iconSizePx = (iconSize * resources.displayMetrics.density).toInt()
+                val iconMarginPx = (24 * resources.displayMetrics.density).toInt()
+                
+                // Get delete icon
+                val deleteIcon = ContextCompat.getDrawable(this@MainActivity, R.drawable.ic_delete)
+                
+                // Calculate alpha based on swipe distance (fade in effect)
+                val swipeThreshold = itemView.width * 0.25f
+                val alpha = (kotlin.math.abs(dX) / swipeThreshold).coerceIn(0f, 1f)
+                
+                // Background color with alpha
+                val backgroundColor = ContextCompat.getColor(this@MainActivity, R.color.status_error)
+                val paint = android.graphics.Paint().apply {
+                    color = backgroundColor
+                    this.alpha = (alpha * 255).toInt()
+                }
+                
+                if (dX > 0) {
+                    // Swiping right
+                    val backgroundRect = android.graphics.RectF(
+                        itemView.left.toFloat(),
+                        itemView.top.toFloat(),
+                        itemView.left + dX,
+                        itemView.bottom.toFloat()
+                    )
+                    
+                    // Draw rounded background
+                    val cornerRadius = 16 * resources.displayMetrics.density
+                    c.drawRoundRect(backgroundRect, cornerRadius, cornerRadius, paint)
+                    
+                    // Draw delete icon
+                    deleteIcon?.let { icon ->
+                        val iconTop = itemView.top + (itemView.height - iconSizePx) / 2
+                        val iconLeft = itemView.left + iconMarginPx
+                        val iconRight = iconLeft + iconSizePx
+                        val iconBottom = iconTop + iconSizePx
+                        
+                        icon.setBounds(iconLeft, iconTop, iconRight, iconBottom)
+                        icon.alpha = (alpha * 255).toInt()
+                        icon.draw(c)
+                    }
+                } else if (dX < 0) {
+                    // Swiping left
+                    val backgroundRect = android.graphics.RectF(
+                        itemView.right + dX,
+                        itemView.top.toFloat(),
+                        itemView.right.toFloat(),
+                        itemView.bottom.toFloat()
+                    )
+                    
+                    // Draw rounded background
+                    val cornerRadius = 16 * resources.displayMetrics.density
+                    c.drawRoundRect(backgroundRect, cornerRadius, cornerRadius, paint)
+                    
+                    // Draw delete icon
+                    deleteIcon?.let { icon ->
+                        val iconTop = itemView.top + (itemView.height - iconSizePx) / 2
+                        val iconRight = itemView.right - iconMarginPx
+                        val iconLeft = iconRight - iconSizePx
+                        val iconBottom = iconTop + iconSizePx
+                        
+                        icon.setBounds(iconLeft, iconTop, iconRight, iconBottom)
+                        icon.alpha = (alpha * 255).toInt()
+                        icon.draw(c)
+                    }
+                }
+                
+                super.onChildDraw(c, recyclerView, viewHolder, dX, dY, actionState, isCurrentlyActive)
+            }
+        }
+        
+        ItemTouchHelper(swipeCallback).attachToRecyclerView(recyclerView)
+    }
+    
+    private fun deleteJobAndFile(job: JobEntry, position: Int) {
+        // Stop download if active
+        if (job.status == "downloading" || job.status == "queued") {
+            val stopIntent = Intent(this, DownloadService::class.java).apply {
+                action = DownloadService.ACTION_STOP_DOWNLOAD
+                putExtra(DownloadService.EXTRA_JOB_ID, job.jobId)
+            }
+            try {
+                startService(stopIntent)
+            } catch (e: Exception) {
+                Log.e("MainActivity", "Failed to stop download: ${e.message}")
+            }
+        }
+        
+        // Delete file from disk if exists
+        if (!job.localUri.isNullOrEmpty()) {
+            try {
+                val uri = Uri.parse(job.localUri)
+                
+                // Try to get file path from content URI
+                if (uri.scheme == "content") {
+                    // For FileProvider URIs, we need to find the actual file
+                    // The file is in Downloads/Everyload/ directory
+                    val publicDownloadsDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)
+                    val everyloadDir = File(publicDownloadsDir, "Everyload")
+                    
+                    // Find file by title or last path segment
+                    val fileName = uri.lastPathSegment?.substringAfterLast("/") 
+                        ?: job.title?.let { sanitizeFileName(it) }
+                    
+                    if (fileName != null) {
+                        // Search for the file in Everyload directory
+                        val possibleFiles = everyloadDir.listFiles()?.filter { 
+                            it.name.contains(fileName, ignoreCase = true) ||
+                            (job.title != null && it.name.contains(sanitizeFileName(job.title!!), ignoreCase = true))
+                        }
+                        
+                        possibleFiles?.forEach { file ->
+                            if (file.exists() && file.delete()) {
+                                Log.d("MainActivity", "Deleted file: ${file.absolutePath}")
+                            }
+                        }
+                    }
+                } else if (uri.scheme == "file") {
+                    val file = File(uri.path!!)
+                    if (file.exists() && file.delete()) {
+                        Log.d("MainActivity", "Deleted file: ${file.absolutePath}")
+                    }
+                }
+            } catch (e: Exception) {
+                Log.e("MainActivity", "Failed to delete file: ${e.message}")
+            }
+        }
+        
+        // Remove from list
+        jobs.removeAt(position)
+        adapter.notifyItemRemoved(position)
+        saveJobsToPrefs()
+        
+        Toast.makeText(this, getString(R.string.toast_deleted, job.title ?: job.jobId), Toast.LENGTH_SHORT).show()
+    }
+    
+    private fun sanitizeFileName(title: String): String {
+        return title
+            .replace(Regex("[\\\\/:*?\"<>|]"), "_")
+            .replace(Regex("[\\s]+"), "_")
+            .replace(Regex("[_]+"), "_")
+            .replace(Regex("^_|_$"), "")
+            .take(100)
     }
     
     private fun getMimeType(fileName: String): String {
@@ -1032,7 +1224,7 @@ class MainActivity : AppCompatActivity(), DownloadService.DownloadServiceCallbac
                 intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
                 startActivity(intent)
             } catch (e: Exception) {
-                Toast.makeText(this, "Nie można otworzyć pliku: ${e.message}", Toast.LENGTH_LONG).show()
+                Toast.makeText(this, getString(R.string.toast_cannot_open_file, e.message ?: ""), Toast.LENGTH_LONG).show()
             }
         }
     }
@@ -1098,9 +1290,9 @@ class MainActivity : AppCompatActivity(), DownloadService.DownloadServiceCallbac
     private fun clearAllJobs() {
         if (jobs.isNotEmpty()) {
             AlertDialog.Builder(this)
-                .setTitle("Wyczyść listę")
-                .setMessage("Czy chcesz usunąć wszystkie zadania (${jobs.size})? To zatrzyma także aktywne pobierania.")
-                .setPositiveButton("Tak") { _, _ ->
+                .setTitle(getString(R.string.dialog_clear_list))
+                .setMessage(getString(R.string.dialog_clear_message, jobs.size))
+                .setPositiveButton(getString(R.string.btn_yes)) { _, _ ->
                     // Stop any active downloads first
                     val activeJobs = jobs.filter { job ->
                         job.status == "downloading" || job.status == "queued" || job.status == "pending"
@@ -1127,12 +1319,12 @@ class MainActivity : AppCompatActivity(), DownloadService.DownloadServiceCallbac
                     jobs.clear()
                     adapter.notifyDataSetChanged()
                     saveJobsToPrefs()
-                    Toast.makeText(this, "Usunięto wszystkie zadania ($totalJobs)", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(this, getString(R.string.toast_deleted_all, totalJobs), Toast.LENGTH_SHORT).show()
                 }
-                .setNegativeButton("Anuluj", null)
+                .setNegativeButton(getString(R.string.btn_cancel), null)
                 .show()
         } else {
-            Toast.makeText(this, "Brak zadań do usunięcia", Toast.LENGTH_SHORT).show()
+            Toast.makeText(this, getString(R.string.toast_no_jobs_to_delete), Toast.LENGTH_SHORT).show()
         }
     }
     
@@ -1143,9 +1335,9 @@ class MainActivity : AppCompatActivity(), DownloadService.DownloadServiceCallbac
         
         if (activeJobs.isNotEmpty()) {
             AlertDialog.Builder(this)
-                .setTitle("Zatrzymaj pobierania")
-                .setMessage("Czy chcesz zatrzymać wszystkie aktywne pobierania? (${activeJobs.size} zadań)")
-                .setPositiveButton("Tak") { _, _ ->
+                .setTitle(getString(R.string.dialog_stop_downloads))
+                .setMessage(getString(R.string.dialog_stop_message, activeJobs.size))
+                .setPositiveButton(getString(R.string.btn_yes)) { _, _ ->
                     // Clear download queue and reset active count
                     synchronized(downloadQueue) {
                         downloadQueue.clear()
@@ -1172,12 +1364,12 @@ class MainActivity : AppCompatActivity(), DownloadService.DownloadServiceCallbac
                     adapter.notifyDataSetChanged()
                     saveJobsToPrefs()
                     
-                    Toast.makeText(this, "Zatrzymano ${activeJobs.size} zadań", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(this, getString(R.string.toast_stopped_jobs, activeJobs.size), Toast.LENGTH_SHORT).show()
                 }
-                .setNegativeButton("Anuluj", null)
+                .setNegativeButton(getString(R.string.btn_cancel), null)
                 .show()
         } else {
-            Toast.makeText(this, "Brak aktywnych pobrań do zatrzymania", Toast.LENGTH_SHORT).show()
+            Toast.makeText(this, getString(R.string.toast_no_active_downloads), Toast.LENGTH_SHORT).show()
         }
     }
 }

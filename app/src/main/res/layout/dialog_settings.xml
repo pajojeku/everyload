@@ -17,7 +17,7 @@
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="Format pobierania"
+            android:text="@string/settings_format"
             android:textSize="14sp"
             android:fontFamily="sans-serif-medium"
             android:textColor="?attr/colorOnSurface"
@@ -49,7 +49,7 @@
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="Jakość wideo"
+            android:text="@string/settings_quality"
             android:textSize="14sp"
             android:fontFamily="sans-serif-medium"
             android:textColor="?attr/colorOnSurface"
@@ -109,7 +109,7 @@
                 <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="Pobieraj playlisty"
+                    android:text="@string/settings_playlist"
                     android:textSize="14sp"
                     android:fontFamily="sans-serif-medium"
                     android:textColor="?attr/colorOnSurface" />
@@ -117,7 +117,7 @@
                 <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="Automatycznie rozpoznawaj playlisty"
+                    android:text="@string/settings_playlist_desc"
                     android:textSize="12sp"
                     android:fontFamily="sans-serif"
                     android:textColor="?attr/colorOnSurfaceVariant"
@@ -154,7 +154,7 @@
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="Maksymalna liczba jednoczesnych pobrań"
+            android:text="@string/settings_concurrent_desc"
             android:textSize="12sp"
             android:fontFamily="sans-serif"
             android:textColor="?attr/colorOnSurfaceVariant"
@@ -174,7 +174,7 @@
             android:id="@+id/stopAllButton"
             android:layout_width="match_parent"
             android:layout_height="48dp"
-            android:text="Zatrzymaj wszystkie pobierania"
+            android:text="@string/settings_stop_all"
             android:textAllCaps="false"
             app:backgroundTint="@color/status_error"
             app:cornerRadius="24dp"

@@ -37,59 +37,61 @@ class JobAdapter(
         holder.title.text = item.title ?: item.files?.firstOrNull() ?: item.jobId
         holder.url.text = item.localUri ?: item.url
         
+        val context = holder.itemView.context
+        
         // Style status based on state
         when (item.status) {
             "downloaded" -> {
-                holder.status.text = "Saved"
-                holder.status.setTextColor(ContextCompat.getColor(holder.itemView.context, R.color.status_saved))
+                holder.status.text = context.getString(R.string.status_saved)
+                holder.status.setTextColor(ContextCompat.getColor(context, R.color.status_saved))
                 holder.status.setTypeface(null, Typeface.BOLD)
                 holder.spinner.visibility = View.GONE
             }
             "downloading_local" -> {
-                holder.status.text = "Downloading..."
-                holder.status.setTextColor(ContextCompat.getColor(holder.itemView.context, R.color.status_downloading))
+                holder.status.text = context.getString(R.string.status_downloading)
+                holder.status.setTextColor(ContextCompat.getColor(context, R.color.status_downloading))
                 holder.status.setTypeface(null, Typeface.NORMAL)
                 holder.spinner.visibility = View.VISIBLE
             }
             "finished" -> {
-                holder.status.text = "Ready"
-                holder.status.setTextColor(ContextCompat.getColor(holder.itemView.context, R.color.status_ready))
+                holder.status.text = context.getString(R.string.status_ready)
+                holder.status.setTextColor(ContextCompat.getColor(context, R.color.status_ready))
                 holder.status.setTypeface(null, Typeface.NORMAL)
                 holder.spinner.visibility = View.GONE
             }
             "error", "download_error" -> {
-                holder.status.text = "Error"
-                holder.status.setTextColor(ContextCompat.getColor(holder.itemView.context, R.color.status_error))
+                holder.status.text = context.getString(R.string.status_error)
+                holder.status.setTextColor(ContextCompat.getColor(context, R.color.status_error))
                 holder.status.setTypeface(null, Typeface.BOLD)
                 holder.spinner.visibility = View.GONE
             }
             "queued" -> {
-                holder.status.text = "Queued"
-                holder.status.setTextColor(ContextCompat.getColor(holder.itemView.context, R.color.status_queued))
+                holder.status.text = context.getString(R.string.status_queued)
+                holder.status.setTextColor(ContextCompat.getColor(context, R.color.status_queued))
                 holder.status.setTypeface(null, Typeface.NORMAL)
                 holder.spinner.visibility = View.GONE
             }
             "downloading", "running" -> {
-                holder.status.text = "Processing..."
-                holder.status.setTextColor(ContextCompat.getColor(holder.itemView.context, R.color.status_downloading))
+                holder.status.text = context.getString(R.string.status_processing)
+                holder.status.setTextColor(ContextCompat.getColor(context, R.color.status_downloading))
                 holder.status.setTypeface(null, Typeface.NORMAL)
                 holder.spinner.visibility = View.VISIBLE
             }
             "extracting" -> {
-                holder.status.text = "Extracting playlist..."
-                holder.status.setTextColor(ContextCompat.getColor(holder.itemView.context, R.color.status_downloading))
+                holder.status.text = context.getString(R.string.status_extracting)
+                holder.status.setTextColor(ContextCompat.getColor(context, R.color.status_downloading))
                 holder.status.setTypeface(null, Typeface.NORMAL)
                 holder.spinner.visibility = View.VISIBLE
             }
             "stopped" -> {
-                holder.status.text = "Stopped"
-                holder.status.setTextColor(ContextCompat.getColor(holder.itemView.context, R.color.status_error))
+                holder.status.text = context.getString(R.string.status_stopped)
+                holder.status.setTextColor(ContextCompat.getColor(context, R.color.status_error))
                 holder.status.setTypeface(null, Typeface.NORMAL)
                 holder.spinner.visibility = View.GONE
             }
             else -> {
                 holder.status.text = item.status
-                holder.status.setTextColor(ContextCompat.getColor(holder.itemView.context, R.color.status_queued))
+                holder.status.setTextColor(ContextCompat.getColor(context, R.color.status_queued))
                 holder.status.setTypeface(null, Typeface.NORMAL)
                 holder.spinner.visibility = View.GONE
             }

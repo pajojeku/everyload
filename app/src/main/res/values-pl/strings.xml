@@ -1,0 +1,133 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Everyload</string>
+    
+    <!-- Main UI -->
+    <string name="hint_paste_link">Wklej link do wideo…</string>
+    <string name="btn_download">Pobierz</string>
+    <string name="section_downloads">Pobrane</string>
+    <string name="empty_state_title">Brak pobrań</string>
+    <string name="empty_state_description">Wklej link lub udostępnij wideo\nz YouTube, aby rozpocząć</string>
+    
+    <!-- Status labels -->
+    <string name="status_saved">Zapisane</string>
+    <string name="status_downloading">Pobieranie…</string>
+    <string name="status_ready">Gotowe</string>
+    <string name="status_error">Błąd</string>
+    <string name="status_queued">W kolejce</string>
+    <string name="status_processing">Przetwarzanie…</string>
+    <string name="status_extracting">Wyodrębnianie playlisty…</string>
+    <string name="status_stopped">Zatrzymane</string>
+    
+    <!-- Toasts & Messages -->
+    <string name="toast_paste_link">Wklej link do pobrania</string>
+    <string name="toast_url_received">Odebrano URL z udostępnienia</string>
+    <string name="toast_download_started">Pobieranie rozpoczęte</string>
+    <string name="toast_added_to_queue">Dodano do kolejki</string>
+    <string name="toast_invalid_url">Nieprawidłowy URL: %s</string>
+    <string name="toast_downloaded">Pobrano: %s</string>
+    <string name="toast_download_error">Błąd pobierania</string>
+    <string name="toast_download_failed">Pobieranie nieudane: %s</string>
+    <string name="toast_deleted">Usunięto: %s</string>
+    <string name="toast_settings_saved">Ustawienia zapisane</string>
+    <string name="toast_cannot_open_file">Nie można otworzyć pliku: %s</string>
+    <string name="toast_deleted_all">Usunięto wszystkie zadania (%d)</string>
+    <string name="toast_no_jobs_to_delete">Brak zadań do usunięcia</string>
+    <string name="toast_stopped_jobs">Zatrzymano %d zadań</string>
+    <string name="toast_no_active_downloads">Brak aktywnych pobrań do zatrzymania</string>
+    <string name="toast_permissions_denied">Niektóre uprawnienia zostały odrzucone. Aplikacja może nie działać prawidłowo.</string>
+    <string name="toast_notification_denied">Uprawnienie do powiadomień odrzucone. Pobieranie w tle nie będzie pokazywać postępu.</string>
+    <string name="toast_no_videos_in_playlist">Nie znaleziono filmów w playliście</string>
+    <string name="toast_found_videos">Znaleziono %d filmów w playliście</string>
+    
+    <!-- Errors -->
+    <string name="error_cannot_access_directory">Nie można uzyskać dostępu do katalogu</string>
+    <string name="error_cannot_create_directory">Nie można utworzyć katalogu</string>
+    <string name="error_directory_not_writable">Katalog niedostępny do zapisu</string>
+    <string name="error_ytdlp_unavailable">YoutubeDL niedostępny</string>
+    <string name="error_playlist_extraction">Błąd pobierania informacji o playliście: %s</string>
+    <string name="error_playlist_analysis">Błąd analizy playlisty: %s</string>
+    <string name="error_unexpected">Nieoczekiwany błąd po %d próbach: %s</string>
+    <string name="error_unexpected_short">Nieoczekiwany błąd po %d próbach</string>
+    <string name="error_youtube_blocked">YouTube zablokował pobieranie po %d próbach. Spróbuj ponownie za kilka minut.</string>
+    <string name="error_video_unavailable">Wideo niedostępne</string>
+    <string name="error_private_video">Wideo prywatne</string>
+    <string name="error_no_formats">Brak dostępnych formatów wideo</string>
+    <string name="error_network">Błąd sieci po %d próbach</string>
+    <string name="error_access_denied">Dostęp zabroniony - wideo może być zablokowane</string>
+    <string name="error_video_not_found">Wideo nie znalezione</string>
+    <string name="error_connection">Błąd połączenia po %d próbach</string>
+    <string name="error_verification_required">YouTube wymaga dodatkowej weryfikacji po %d próbach.</string>
+    <string name="error_download_failed">Błąd pobierania po %d próbach: %s</string>
+    <string name="error_cannot_create_download_dir">Nie można utworzyć katalogu pobierania</string>
+    <string name="error_directory_not_accessible">Katalog pobierania jest niedostępny</string>
+    <string name="error_cannot_access_download_dir">Nie można uzyskać dostępu do katalogu pobierania</string>
+    <string name="error_file_access">Błąd dostępu do pliku: %s</string>
+    <string name="error_file_not_found">Nie znaleziono pobranego pliku</string>
+    <string name="error_no_files_in_directory">Brak plików w katalogu pobierania</string>
+    
+    <!-- Dialogs -->
+    <string name="dialog_error">Błąd</string>
+    <string name="dialog_link_shared">Udostępniono link</string>
+    <string name="dialog_download_question">Czy chcesz pobrać:\n%s</string>
+    <string name="dialog_unsupported_link">Nieobsługiwany link</string>
+    <string name="dialog_youtube_only">Otrzymano: %s\n\nObsługiwane są tylko linki YouTube.</string>
+    <string name="dialog_playlist_detected">Wykryto playlistę</string>
+    <string name="dialog_playlist_question">Czy chcesz pobrać całą playlistę? Możesz to zmienić w ustawieniach.</string>
+    <string name="btn_download_playlist">Tak, pobierz playlistę</string>
+    <string name="btn_this_video_only">Tylko to wideo</string>
+    <string name="dialog_delete_title">Usunąć pobranie?</string>
+    <string name="dialog_delete_message">Czy na pewno chcesz usunąć \"%s\"?\n\nSpowoduje to również usunięcie pliku z urządzenia.</string>
+    <string name="btn_delete">Usuń</string>
+    <string name="btn_cancel">Anuluj</string>
+    <string name="btn_ok">OK</string>
+    <string name="btn_save">Zapisz</string>
+    <string name="btn_yes">Tak</string>
+    <string name="dialog_clear_list">Wyczyść listę</string>
+    <string name="dialog_clear_message">Czy chcesz usunąć wszystkie zadania (%d)? To zatrzyma także aktywne pobierania.</string>
+    <string name="dialog_stop_downloads">Zatrzymaj pobierania</string>
+    <string name="dialog_stop_message">Czy chcesz zatrzymać wszystkie aktywne pobierania? (%d zadań)</string>
+    <string name="dialog_settings">Ustawienia</string>
+    
+    <!-- Settings -->
+    <string name="settings_format">Format pobierania</string>
+    <string name="settings_quality">Jakość wideo</string>
+    <string name="settings_max_attempts">Maksymalne próby: %d</string>
+    <string name="settings_playlist">Pobieraj playlisty</string>
+    <string name="settings_playlist_desc">Automatycznie rozpoznawaj playlisty</string>
+    <string name="settings_concurrent">Równoczesne pobierania: %d</string>
+    <string name="settings_concurrent_desc">Maksymalna liczba jednoczesnych pobrań</string>
+    <string name="settings_stop_all">Zatrzymaj wszystkie pobierania</string>
+    <string name="settings_ffmpeg_info">ℹ️ Pobieranie MP3 używa konwersji formatu dla lepszej kompatybilności.</string>
+    
+    <!-- Info messages -->
+    <string name="info_extracting_playlist">Pobieranie informacji o playliście…</string>
+    <string name="info_connecting_playlist">Łączenie z playlistą…</string>
+    <string name="info_analyzing_playlist">Analizowanie playlisty: %d%%</string>
+    <string name="info_queued_position">W kolejce (%d/%d)</string>
+    <string name="info_attempt_connecting">Próba %d/%d - Łączenie…</string>
+    <string name="info_attempt_downloading">Próba %d/%d - Pobieranie: %d%%</string>
+    <string name="info_download_completed">Pobieranie zakończone (próba %d/%d)</string>
+    <string name="info_attempt_failed_retry">Próba %d nieudana. Ponowienie za %ds…</string>
+    <string name="info_unexpected_error_retry">Nieoczekiwany błąd w próbie %d. Ponowienie…</string>
+    <string name="info_starting_download">Rozpoczynanie pobierania…</string>
+    
+    <!-- Format options -->
+    <string-array name="format_options">
+        <item>MP3 (tylko audio)</item>
+        <item>MP4 (wideo)</item>
+        <item>Najlepsza jakość</item>
+    </string-array>
+    
+    <!-- Quality options -->
+    <string-array name="quality_options">
+        <item>480p</item>
+        <item>720p</item>
+        <item>1080p</item>
+        <item>Najlepsza dostępna</item>
+    </string-array>
+    
+    <!-- Menu -->
+    <string name="action_settings">Ustawienia</string>
+    <string name="action_clear_downloads">Wyczyść wszystko</string>
+</resources>

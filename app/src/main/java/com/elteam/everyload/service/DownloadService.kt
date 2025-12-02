@@ -206,6 +206,32 @@ class DownloadService : Service() {
         Log.d("DownloadService", "Job validation passed - URL: ${job.url}, ID: ${job.jobId}")
         
         try {
+            // First, extract video title if not already set
+            if (job.title.isNullOrEmpty()) {
+                job.info = "Fetching video info..."
+                downloadCallbacks?.onJobUpdated(job)
+                
+                try {
+                    val infoRequest = YoutubeDLRequest(job.url).apply {
+                        addOption("--no-playlist")
+                        addOption("--print", "%(title)s")
+                        addOption("--skip-download")
+                    }
+                    
+                    val youtubeDLInstance = YoutubeDL.getInstance()
+                    val result = youtubeDLInstance.execute(infoRequest) { _, _, _ -> }
+                    
+                    val extractedTitle = result.out?.trim()
+                    if (!extractedTitle.isNullOrEmpty() && extractedTitle != "NA") {
+                        job.title = extractedTitle
+                        Log.d("DownloadService", "Extracted title: ${job.title}")
+                    }
+                } catch (e: Exception) {
+                    Log.w("DownloadService", "Failed to extract title: ${e.message}")
+                    // Continue with download even if title extraction fails
+                }
+            }
+            
             // Update status
             job.status = "downloading"
             downloadCallbacks?.onJobUpdated(job)
@@ -243,8 +269,22 @@ class DownloadService : Service() {
                 throw Exception("Download directory is not accessible or writable: ${youtubeDLDir.absolutePath}")
             }
 
-            // Create download request with validated paths
-            val outputTemplate = "${youtubeDLDir.absolutePath}/%(title)s.%(ext)s"
+            // Create safe filename from title - replace special characters with underscores
+            val safeTitle = job.title?.let { title ->
+                title
+                    .replace(Regex("[\\\\/:*?\"<>|]"), "_")  // Windows-incompatible chars
+                    .replace(Regex("[\\s]+"), "_")           // Spaces to underscores
+                    .replace(Regex("[_]+"), "_")             // Multiple underscores to single
+                    .replace(Regex("^_|_$"), "")             // Trim leading/trailing underscores
+                    .take(100)                                // Limit length
+            } ?: "%(title)s"  // Fallback to yt-dlp template if no title
+            
+            // Use sanitized title or yt-dlp's built-in sanitization
+            val outputTemplate = if (safeTitle != "%(title)s") {
+                "${youtubeDLDir.absolutePath}/${safeTitle}.%(ext)s"
+            } else {
+                "${youtubeDLDir.absolutePath}/%(title)s.%(ext)s"
+            }
             Log.d("DownloadService", "Output template: $outputTemplate")
             
             // Validate URL and template before creating request
