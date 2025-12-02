@@ -274,22 +274,23 @@ class DownloadService : Service() {
                 throw Exception("Download directory is not accessible or writable: ${youtubeDLDir.absolutePath}")
             }
 
+            // Create unique identifier from jobId (last 8 chars)
+            val uniqueId = job.jobId.takeLast(8)
+            
             // Create safe filename from title - replace special characters with underscores
             val safeTitle = job.title?.let { title ->
-                title
+                val cleanTitle = title
                     .replace(Regex("[\\\\/:*?\"<>|]"), "_")  // Windows-incompatible chars
                     .replace(Regex("[\\s]+"), "_")           // Spaces to underscores
                     .replace(Regex("[_]+"), "_")             // Multiple underscores to single
                     .replace(Regex("^_|_$"), "")             // Trim leading/trailing underscores
-                    .take(100)                                // Limit length
-            } ?: "%(title)s"  // Fallback to yt-dlp template if no title
+                    .take(80)                                 // Limit length to leave room for ID
+                // Add unique ID to prevent filename collisions
+                "${cleanTitle}_${uniqueId}"
+            } ?: "video_${uniqueId}"  // Fallback with unique ID
             
-            // Use sanitized title or yt-dlp's built-in sanitization
-            val outputTemplate = if (safeTitle != "%(title)s") {
-                "${youtubeDLDir.absolutePath}/${safeTitle}.%(ext)s"
-            } else {
-                "${youtubeDLDir.absolutePath}/%(title)s.%(ext)s"
-            }
+            // Use sanitized title with unique ID
+            val outputTemplate = "${youtubeDLDir.absolutePath}/${safeTitle}.%(ext)s"
             Log.d("DownloadService", "Output template: $outputTemplate")
             
             // Validate URL and template before creating request
@@ -426,13 +427,24 @@ class DownloadService : Service() {
                     // Download completed successfully
                     job.status = "finished"
                     
-                    // Find downloaded file
-                    val downloadedFiles = youtubeDLDir.listFiles()?.filter { 
-                        it.isFile && it.lastModified() > System.currentTimeMillis() - 300000
+                    // Find downloaded file by matching the expected filename (safeTitle contains unique ID)
+                    Log.d("DownloadService", "Looking for file with prefix: $safeTitle")
+                    
+                    val downloadedFile = youtubeDLDir.listFiles()?.firstOrNull { file ->
+                        file.isFile && file.nameWithoutExtension.equals(safeTitle, ignoreCase = true)
                     }
                     
-                    val latestFile = downloadedFiles?.maxByOrNull { it.lastModified() }
+                    // Fallback: if not found by exact name, look for file containing our unique ID
+                    val latestFile = downloadedFile ?: youtubeDLDir.listFiles()?.firstOrNull { file ->
+                        file.isFile && file.name.contains(uniqueId)
+                    } ?: youtubeDLDir.listFiles()?.filter { 
+                        // Last resort: most recently modified file (but only from last 30 seconds)
+                        it.isFile && it.lastModified() > System.currentTimeMillis() - 30000
+                    }?.maxByOrNull { it.lastModified() }
+                    
                     if (latestFile?.exists() == true) {
+                        Log.d("DownloadService", "Found downloaded file: ${latestFile.name}")
+                        
                         // Post-process for MP3 conversion if needed
                         val finalFile = if (requestedFormat == "mp3" && !latestFile.name.endsWith(".mp3", ignoreCase = true)) {
                             job.info = "Converting to MP3..."

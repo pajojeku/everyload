@@ -669,9 +669,21 @@ class MainActivity : AppCompatActivity(), DownloadService.DownloadServiceCallbac
             return
         }
         
+        // Create unique filename with job ID to prevent collisions
+        val uniqueId = entry.jobId.takeLast(8)
+        val safeTitle = entry.title?.let { title ->
+            val cleanTitle = title
+                .replace(Regex("[\\\\/:*?\"<>|]"), "_")
+                .replace(Regex("[\\s]+"), "_")
+                .replace(Regex("[_]+"), "_")
+                .replace(Regex("^_|_$"), "")
+                .take(80)
+            "${cleanTitle}_${uniqueId}"
+        } ?: "video_${uniqueId}"
+        
         // Download request with user settings
         val request = YoutubeDLRequest(entry.url).apply {
-            addOption("-o", "${youtubeDLDir.absolutePath}/%(title)s.%(ext)s")
+            addOption("-o", "${youtubeDLDir.absolutePath}/${safeTitle}.%(ext)s")
             
             // Always download single video (no playlist)
             addOption("--no-playlist")
@@ -744,30 +756,40 @@ class MainActivity : AppCompatActivity(), DownloadService.DownloadServiceCallbac
                         entry.status = "finished"
                         entry.info = getString(R.string.info_download_completed, currentAttempt, maxAttempts)
                         
-                        // Find the downloaded file
-                        val downloadedFiles = youtubeDLDir.listFiles()?.filter { 
-                            it.isFile && it.lastModified() > System.currentTimeMillis() - 300000 // within last 5 minutes
+                        // Find the downloaded file by matching our unique filename
+                        Log.d("YouTubeDL", "Looking for file with prefix: $safeTitle")
+                        
+                        // First try to find by exact name match
+                        var downloadedFile = youtubeDLDir.listFiles()?.firstOrNull { file ->
+                            file.isFile && file.nameWithoutExtension.equals(safeTitle, ignoreCase = true)
                         }
                         
-                        if (!downloadedFiles.isNullOrEmpty()) {
-                            val latestFile = downloadedFiles.maxByOrNull { it.lastModified() }
-                            if (latestFile != null && latestFile.exists()) {
-                                try {
-                                    // Use FileProvider for the downloaded file
-                                    val authority = "${applicationContext.packageName}.provider"
-                                    val contentUri = FileProvider.getUriForFile(applicationContext, authority, latestFile)
-                                    entry.localUri = contentUri.toString()
-                                    entry.status = "downloaded"
-                                    Log.d("YouTubeDL", "File downloaded successfully: ${latestFile.absolutePath}")
-                                } catch (e: Exception) {
-                                    Log.e("YouTubeDL", "Failed to create file URI", e)
-                                    entry.status = "error"
-                                    entry.info = getString(R.string.error_file_access, e.message ?: "")
-                                }
-                            } else {
-                                Log.w("YouTubeDL", "No downloaded file found in directory")
+                        // Fallback: find by unique ID
+                        if (downloadedFile == null) {
+                            downloadedFile = youtubeDLDir.listFiles()?.firstOrNull { file ->
+                                file.isFile && file.name.contains(uniqueId)
+                            }
+                        }
+                        
+                        // Last resort: recently modified file (within 30 seconds)
+                        if (downloadedFile == null) {
+                            downloadedFile = youtubeDLDir.listFiles()?.filter { 
+                                it.isFile && it.lastModified() > System.currentTimeMillis() - 30000
+                            }?.maxByOrNull { it.lastModified() }
+                        }
+                        
+                        if (downloadedFile != null && downloadedFile.exists()) {
+                            try {
+                                // Use FileProvider for the downloaded file
+                                val authority = "${applicationContext.packageName}.provider"
+                                val contentUri = FileProvider.getUriForFile(applicationContext, authority, downloadedFile)
+                                entry.localUri = contentUri.toString()
+                                entry.status = "downloaded"
+                                Log.d("YouTubeDL", "File downloaded successfully: ${downloadedFile.absolutePath}")
+                            } catch (e: Exception) {
+                                Log.e("YouTubeDL", "Failed to create file URI", e)
                                 entry.status = "error"
-                                entry.info = getString(R.string.error_file_not_found)
+                                entry.info = getString(R.string.error_file_access, e.message ?: "")
                             }
                         } else {
                             Log.w("YouTubeDL", "No files found in download directory")
@@ -776,7 +798,7 @@ class MainActivity : AppCompatActivity(), DownloadService.DownloadServiceCallbac
                         }
                         
                         adapter.upsert(entry)
-                        val downloadedFileName = downloadedFiles?.firstOrNull()?.name ?: "file"
+                        val downloadedFileName = downloadedFile?.name ?: "file"
                         if (entry.status == "downloaded") {
                             Toast.makeText(this@MainActivity, getString(R.string.toast_downloaded, downloadedFileName), Toast.LENGTH_LONG).show()
                         } else {
