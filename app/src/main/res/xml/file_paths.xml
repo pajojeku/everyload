@@ -2,4 +2,6 @@
 <paths xmlns:android="http://schemas.android.com/apk/res/android">
     <!-- Allow sharing files saved in getExternalFilesDir() -->
     <external-files-path name="external_files" path="." />
+    <!-- Allow sharing files in public Downloads directory -->
+    <external-path name="external_downloads" path="Download/Everyload" />
 </paths>

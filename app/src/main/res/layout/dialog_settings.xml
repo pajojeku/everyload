@@ -18,7 +18,18 @@
         android:id="@+id/formatSpinner"
         android:layout_width="match_parent"
         android:layout_height="48dp"
-        android:layout_marginBottom="16dp" />
+        android:layout_marginBottom="8dp" />
+    
+    <!-- FFmpeg warning text -->
+    <TextView
+        android:id="@+id/ffmpegWarning"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginBottom="16dp"
+        android:textSize="12sp"
+        android:textColor="#FF9800"
+        android:visibility="gone"
+        android:gravity="center" />
 
     <!-- Quality Selection -->
     <TextView

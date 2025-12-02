@@ -60,6 +60,6 @@ dependencies {
     androidTestImplementation(libs.androidx.espresso.core)
 
     implementation("io.github.junkfood02.youtubedl-android:library:${youtubedlAndroid}")
-    implementation("io.github.junkfood02.youtubedl-android:ffmpeg:${youtubedlAndroid}")
+    // FFmpeg dependency removed - using format selection instead of conversion
     implementation("io.github.junkfood02.youtubedl-android:aria2c:${youtubedlAndroid}")
 }

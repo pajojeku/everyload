@@ -94,7 +94,7 @@ class MainActivity : AppCompatActivity(), DownloadService.DownloadServiceCallbac
         private const val KEY_MAX_CONCURRENT_DOWNLOADS = "max_concurrent_downloads"
     }
     
-    private fun getDownloadFormat(): String = settings.getString(KEY_FORMAT, "best") ?: "best"
+    private fun getDownloadFormat(): String = settings.getString(KEY_FORMAT, "mp4") ?: "mp4"
     private fun getDownloadQuality(): String = settings.getString(KEY_QUALITY, "720p") ?: "720p"
     private fun getMaxAttempts(): Int = settings.getInt(KEY_MAX_ATTEMPTS, 3)
     private fun getAllowPlaylists(): Boolean = settings.getBoolean(KEY_ALLOW_PLAYLISTS, false)
@@ -130,10 +130,18 @@ class MainActivity : AppCompatActivity(), DownloadService.DownloadServiceCallbac
 
         settings = getSharedPreferences("app_settings", MODE_PRIVATE)
         
-        // Initialize YoutubeDL
+        // Initialize YoutubeDL with enhanced error handling
         try {
+            // Ensure app data directory exists
+            val appDataDir = getExternalFilesDir(null) ?: filesDir
+            if (!appDataDir.exists() && !appDataDir.mkdirs()) {
+                Log.e("MainActivity", "Failed to create app data directory")
+            }
+            
             YoutubeDL.getInstance().init(this)
+            Log.d("MainActivity", "YoutubeDL initialized successfully")
         } catch (e: YoutubeDLException) {
+            Log.e("MainActivity", "Failed to initialize YoutubeDL", e)
             e.printStackTrace()
             showErrorDialog("Failed to initialize YoutubeDL: ${e.message}")
         }
@@ -456,15 +464,43 @@ class MainActivity : AppCompatActivity(), DownloadService.DownloadServiceCallbac
         
         Thread {
             try {
-                // Create download directory with null check
+                // Create download directory with comprehensive null checks
                 val externalDir = getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS) 
                     ?: getExternalFilesDir(null) 
                     ?: filesDir
+                
+                if (externalDir == null) {
+                    runOnUiThread {
+                        extractEntry.status = "error"
+                        extractEntry.info = "Nie można uzyskać dostępu do katalogu"
+                        adapter.upsert(extractEntry)
+                        Toast.makeText(this@MainActivity, "Błąd: Nie można uzyskać dostępu do katalogu", Toast.LENGTH_LONG).show()
+                    }
+                    return@Thread
+                }
+                
                 val youtubeDLDir = File(externalDir, "Everyload")
-                Log.d("YouTubeDL", "Download directory: ${youtubeDLDir.absolutePath}")
-                if (!youtubeDLDir.exists()) {
-                    Log.d("YouTubeDL", "Creating download directory...")
-                    youtubeDLDir.mkdirs()
+                Log.d("MainActivity", "Playlist extraction directory: ${youtubeDLDir.absolutePath}")
+                
+                if (!youtubeDLDir.exists() && !youtubeDLDir.mkdirs()) {
+                    runOnUiThread {
+                        extractEntry.status = "error"
+                        extractEntry.info = "Nie można utworzyć katalogu"
+                        adapter.upsert(extractEntry)
+                        Toast.makeText(this@MainActivity, "Błąd: Nie można utworzyć katalogu", Toast.LENGTH_LONG).show()
+                    }
+                    return@Thread
+                }
+                
+                // Validate directory access
+                if (!youtubeDLDir.isDirectory() || !youtubeDLDir.canWrite()) {
+                    runOnUiThread {
+                        extractEntry.status = "error"
+                        extractEntry.info = "Katalog niedostępny do zapisu"
+                        adapter.upsert(extractEntry)
+                        Toast.makeText(this@MainActivity, "Błąd: Katalog niedostępny do zapisu", Toast.LENGTH_LONG).show()
+                    }
+                    return@Thread
                 }
                 
                 // Create request to extract playlist info only
@@ -480,6 +516,18 @@ class MainActivity : AppCompatActivity(), DownloadService.DownloadServiceCallbac
                 }
                 
                 val youtubeDLInstance = YoutubeDL.getInstance()
+                if (youtubeDLInstance == null) {
+                    Log.e("MainActivity", "YoutubeDL instance is null for playlist extraction")
+                    runOnUiThread {
+                        extractEntry.status = "error"
+                        extractEntry.info = "YoutubeDL niedostępny"
+                        adapter.upsert(extractEntry)
+                        Toast.makeText(this@MainActivity, "Błąd: YoutubeDL niedostępny", Toast.LENGTH_LONG).show()
+                    }
+                    return@Thread
+                }
+                
+                Log.d("MainActivity", "Starting playlist extraction for URL: $playlistUrl")
                 val output = StringBuilder()
                 
                 youtubeDLInstance?.execute(request) { progress, eta, line ->
@@ -540,12 +588,15 @@ class MainActivity : AppCompatActivity(), DownloadService.DownloadServiceCallbac
                 }
                 
             } catch (e: Exception) {
-                Log.e("YouTubeDL", "Failed to extract playlist info", e)
+                Log.e("MainActivity", "Failed to extract playlist info for URL: $playlistUrl")
+                Log.e("MainActivity", "Error type: ${e.javaClass.simpleName}")
+                Log.e("MainActivity", "Error message: ${e.message}")
+                Log.e("MainActivity", "Stack trace:", e)
                 runOnUiThread {
                     extractEntry.status = "error"
                     extractEntry.info = "Błąd pobierania informacji o playliście: ${e.message}"
                     adapter.upsert(extractEntry)
-                    Toast.makeText(this@MainActivity, "Błąd analizy playlisty", Toast.LENGTH_LONG).show()
+                    Toast.makeText(this@MainActivity, "Błąd analizy playlisty: ${e.message}", Toast.LENGTH_LONG).show()
                 }
             }
         }.start()
@@ -559,7 +610,19 @@ class MainActivity : AppCompatActivity(), DownloadService.DownloadServiceCallbac
                 action = DownloadService.ACTION_START_DOWNLOAD
                 putExtra(DownloadService.EXTRA_JOB_ENTRY, entry)
             }
-            startService(intent)
+            
+            // For Android 14+, we need to use startForegroundService
+            try {
+                if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
+                    startForegroundService(intent)
+                } else {
+                    startService(intent)
+                }
+            } catch (e: Exception) {
+                Log.e("MainActivity", "Failed to start download service: ${e.message}")
+                // Fallback to legacy method
+                performSingleDownloadLegacy(entry)
+            }
         } else {
             // Fallback to old method if service not available
             performSingleDownloadLegacy(entry)
@@ -807,6 +870,16 @@ class MainActivity : AppCompatActivity(), DownloadService.DownloadServiceCallbac
             else -> 2
         })
         
+        // Check FFmpeg availability and show info about MP3 handling
+        val ffmpegUnavailable = settings.getBoolean("ffmpeg_unavailable", false)
+        if (ffmpegUnavailable) {
+            val warningText = dialogView.findViewById<TextView>(R.id.ffmpegWarning)
+            warningText?.let {
+                it.text = "ℹ️ MP3 downloads use format conversion for best compatibility."
+                it.visibility = View.VISIBLE
+            }
+        }
+        
         // Setup quality spinner
         val qualityAdapter = ArrayAdapter.createFromResource(
             this,
@@ -1033,19 +1106,38 @@ class MainActivity : AppCompatActivity(), DownloadService.DownloadServiceCallbac
     }
 
     private fun clearAllJobs() {
-        val completedJobs = jobs.filter { job ->
-            job.status == "downloaded" || job.status == "finished" || job.status == "error"
-        }
-        
-        if (completedJobs.isNotEmpty()) {
+        if (jobs.isNotEmpty()) {
             AlertDialog.Builder(this)
                 .setTitle("Wyczyść listę")
-                .setMessage("Czy chcesz usunąć ${completedJobs.size} zakończonych zadań?")
+                .setMessage("Czy chcesz usunąć wszystkie zadania (${jobs.size})? To zatrzyma także aktywne pobierania.")
                 .setPositiveButton("Tak") { _, _ ->
-                    jobs.removeAll(completedJobs.toSet())
+                    // Stop any active downloads first
+                    val activeJobs = jobs.filter { job ->
+                        job.status == "downloading" || job.status == "queued" || job.status == "pending"
+                    }
+                    
+                    // Stop the download service for active downloads
+                    if (activeJobs.isNotEmpty()) {
+                        val stopIntent = Intent(this, DownloadService::class.java).apply {
+                            action = DownloadService.ACTION_STOP_ALL_DOWNLOADS
+                        }
+                        try {
+                            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
+                                startForegroundService(stopIntent)
+                            } else {
+                                startService(stopIntent)
+                            }
+                        } catch (e: Exception) {
+                            Log.e("MainActivity", "Failed to stop download service: ${e.message}")
+                        }
+                    }
+                    
+                    // Clear all jobs regardless of status
+                    val totalJobs = jobs.size
+                    jobs.clear()
                     adapter.notifyDataSetChanged()
                     saveJobsToPrefs()
-                    Toast.makeText(this, "Usunięto ${completedJobs.size} zadań", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(this, "Usunięto wszystkie zadania ($totalJobs)", Toast.LENGTH_SHORT).show()
                 }
                 .setNegativeButton("Anuluj", null)
                 .show()
@@ -1073,7 +1165,15 @@ class MainActivity : AppCompatActivity(), DownloadService.DownloadServiceCallbac
                     // Stop the download service
                     val stopIntent = Intent(this, DownloadService::class.java)
                     stopIntent.action = DownloadService.ACTION_STOP_SERVICE
-                    startService(stopIntent)
+                    try {
+                        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
+                            startForegroundService(stopIntent)
+                        } else {
+                            startService(stopIntent)
+                        }
+                    } catch (e: Exception) {
+                        Log.e("MainActivity", "Failed to stop download service: ${e.message}")
+                    }
                     
                     // Update job statuses
                     activeJobs.forEach { job ->

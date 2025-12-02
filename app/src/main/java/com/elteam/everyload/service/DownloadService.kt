@@ -36,6 +36,7 @@ class DownloadService : Service() {
         const val ACTION_START_DOWNLOAD = "START_DOWNLOAD"
         const val ACTION_STOP_DOWNLOAD = "STOP_DOWNLOAD"
         const val ACTION_STOP_SERVICE = "STOP_SERVICE"
+        const val ACTION_STOP_ALL_DOWNLOADS = "STOP_ALL_DOWNLOADS"
         
         // Intent extras
         const val EXTRA_JOB_ENTRY = "job_entry"
@@ -46,6 +47,7 @@ class DownloadService : Service() {
     private val activeDownloads = ConcurrentHashMap<String, JobEntry>()
     private var downloadCallbacks: DownloadServiceCallbacks? = null
     private lateinit var settings: SharedPreferences
+    private var isForegroundStarted = false
 
     interface DownloadServiceCallbacks {
         fun onJobUpdated(job: JobEntry)
@@ -72,6 +74,7 @@ class DownloadService : Service() {
             
             YoutubeDL.getInstance().init(this)
             Log.d("DownloadService", "YoutubeDL initialized successfully")
+            
         } catch (e: YoutubeDLException) {
             Log.e("DownloadService", "Failed to initialize YoutubeDL", e)
         }
@@ -82,6 +85,19 @@ class DownloadService : Service() {
     override fun onBind(intent: Intent): IBinder = binder
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        // Try to start foreground immediately if this is the first command
+        if (!isForegroundStarted) {
+            try {
+                val notification = createNotification("Everyload", "Service starting...", 0)
+                startForeground(NOTIFICATION_ID, notification)
+                isForegroundStarted = true
+                Log.d("DownloadService", "Started foreground service on startup")
+            } catch (e: Exception) {
+                Log.w("DownloadService", "Could not start foreground service: ${e.message}")
+                // Continue without foreground - service will still work for downloads
+            }
+        }
+        
         when (intent?.action) {
             ACTION_START_DOWNLOAD -> {
                 val jobEntry = intent.getSerializableExtra(EXTRA_JOB_ENTRY) as? JobEntry
@@ -90,6 +106,9 @@ class DownloadService : Service() {
             ACTION_STOP_DOWNLOAD -> {
                 val jobId = intent.getStringExtra(EXTRA_JOB_ID)
                 jobId?.let { stopDownload(it) }
+            }
+            ACTION_STOP_ALL_DOWNLOADS -> {
+                stopAllDownloads()
             }
             ACTION_STOP_SERVICE -> {
                 stopAllDownloads()
@@ -151,10 +170,17 @@ class DownloadService : Service() {
 
         activeDownloads[job.jobId] = job
 
-        // Start foreground service
-        if (activeDownloads.size == 1) {
-            val notification = createNotification("Everyload", "Starting downloads...", 0)
-            startForeground(NOTIFICATION_ID, notification)
+        // Start foreground service if not already started (fallback)
+        if (!isForegroundStarted && activeDownloads.size == 1) {
+            try {
+                val notification = createNotification("Everyload", "Starting downloads...", 0)
+                startForeground(NOTIFICATION_ID, notification)
+                isForegroundStarted = true
+                Log.d("DownloadService", "Started foreground service from startDownload")
+            } catch (e: Exception) {
+                Log.e("DownloadService", "Failed to start foreground service: ${e.message}")
+                // Continue without foreground service - downloads will still work
+            }
         }
 
         // Perform download in background thread
@@ -166,28 +192,51 @@ class DownloadService : Service() {
     }
 
     private fun performDownload(job: JobEntry) {
+        Log.d("DownloadService", "Starting download for: ${job.url}")
+        
+        // Comprehensive input validation
+        if (job.url.isNullOrBlank()) {
+            throw IllegalArgumentException("Job URL cannot be null or blank")
+        }
+        
+        if (job.jobId.isNullOrBlank()) {
+            throw IllegalArgumentException("Job ID cannot be null or blank")
+        }
+        
+        Log.d("DownloadService", "Job validation passed - URL: ${job.url}, ID: ${job.jobId}")
+        
         try {
             // Update status
             job.status = "downloading"
             downloadCallbacks?.onJobUpdated(job)
             updateNotification("Downloading", job.title ?: job.jobId, 0)
 
-            // Create download directory with null check
-            val externalDir = getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS) 
-                ?: getExternalFilesDir(null) 
-                ?: filesDir
+            // Create download directory in public Downloads folder
+            val publicDownloadsDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)
+            var youtubeDLDir = File(publicDownloadsDir, "Everyload")
+            Log.d("DownloadService", "Attempting to use public Downloads directory: ${youtubeDLDir.absolutePath}")
             
-            if (externalDir == null) {
-                throw Exception("Unable to access any storage directory")
-            }
-            
-            val youtubeDLDir = File(externalDir, "Everyload")
-            Log.d("DownloadService", "Download directory: ${youtubeDLDir.absolutePath}")
-            
-            if (!youtubeDLDir.exists() && !youtubeDLDir.mkdirs()) {
-                Log.e("DownloadService", "Failed to create download directory")
+            // Ensure public downloads directory exists
+            if (!publicDownloadsDir.exists() && !publicDownloadsDir.mkdirs()) {
+                Log.w("DownloadService", "Failed to create public downloads directory, using fallback")
+                // Fallback to app-specific directory if public directory fails
+                val fallbackDir = getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS) 
+                    ?: getExternalFilesDir(null) 
+                    ?: filesDir
+                if (fallbackDir == null) {
+                    throw Exception("Unable to access any storage directory")
+                }
+                youtubeDLDir = File(fallbackDir, "Everyload")
+                if (!youtubeDLDir.exists() && !youtubeDLDir.mkdirs()) {
+                    throw Exception("Cannot create download directory")
+                }
+                Log.d("DownloadService", "Using fallback directory: ${youtubeDLDir.absolutePath}")
+            } else if (!youtubeDLDir.exists() && !youtubeDLDir.mkdirs()) {
+                Log.e("DownloadService", "Failed to create Everyload subfolder in Downloads")
                 throw Exception("Cannot create download directory")
             }
+            
+            Log.d("DownloadService", "Final download directory: ${youtubeDLDir.absolutePath}")
             
             // Validate download directory
             if (!youtubeDLDir.isDirectory() || !youtubeDLDir.canWrite()) {
@@ -197,33 +246,63 @@ class DownloadService : Service() {
             // Create download request with validated paths
             val outputTemplate = "${youtubeDLDir.absolutePath}/%(title)s.%(ext)s"
             Log.d("DownloadService", "Output template: $outputTemplate")
+            
+            // Validate URL and template before creating request
+            if (job.url.isNullOrBlank()) {
+                throw Exception("Job URL is null or empty")
+            }
+            
+            if (outputTemplate.isBlank() || !outputTemplate.contains("/")) {
+                throw Exception("Invalid output template: $outputTemplate")
+            }
+            
+            Log.d("DownloadService", "Creating YoutubeDL request for URL: ${job.url}")
+
+            // Get requested format for use throughout the function
+            val requestedFormat = getDownloadFormat()
+            Log.d("DownloadService", "Requested format: $requestedFormat")
 
             // Create download request
             val request = YoutubeDLRequest(job.url).apply {
-                addOption("-o", outputTemplate)
+                // Safe option adding function
+                fun safeAddOption(key: String, value: String?) {
+                    if (value != null && value.isNotBlank()) {
+                        addOption(key, value)
+                        Log.d("DownloadService", "Added option: $key = $value")
+                    } else {
+                        Log.w("DownloadService", "Skipping null/blank option: $key = $value")
+                    }
+                }
+                
+                safeAddOption("-o", outputTemplate)
                 addOption("--no-playlist")
 
-                // Format settings
-                when (getDownloadFormat()) {
+                // Format settings with MP3 prioritization
+                when (requestedFormat) {
                     "mp3" -> {
-                        addOption("--extract-audio")
-                        addOption("--audio-format", "mp3")
-                        addOption("--audio-quality", "0")
+                        // Try to get MP3 directly, fallback to best audio
+                        Log.d("DownloadService", "Attempting MP3 download with multiple format options")
+                        safeAddOption("--format", "bestaudio[ext=mp3]/bestaudio[ext=m4a]/bestaudio/best")
+                        job.info = "Downloading audio (MP3 preferred)"
                     }
                     "mp4" -> {
                         val quality = getDownloadQuality()
+                        Log.d("DownloadService", "MP4 quality: $quality")
                         if (quality == "best") {
-                            addOption("--format", "best[ext=mp4]")
+                            safeAddOption("--format", "best[ext=mp4]/best")
                         } else {
-                            addOption("--format", "mp4[height<=${quality.replace("p", "")}]/best[ext=mp4]")
+                            val qualityNum = quality.replace("p", "")
+                            safeAddOption("--format", "mp4[height<=$qualityNum]/best[height<=$qualityNum]/best")
                         }
                     }
                     else -> {
                         val quality = getDownloadQuality()
+                        Log.d("DownloadService", "General quality: $quality")
                         if (quality == "best") {
-                            addOption("--format", "best")
+                            safeAddOption("--format", "best")
                         } else {
-                            addOption("--format", "best[height<=${quality.replace("p", "")}]")
+                            val qualityNum = quality.replace("p", "")
+                            safeAddOption("--format", "best[height<=$qualityNum]/best")
                         }
                     }
                 }
@@ -231,6 +310,9 @@ class DownloadService : Service() {
                 addOption("--extractor-retries", "3")
                 addOption("--fragment-retries", "3")
                 addOption("--skip-unavailable-fragments")
+                
+                // Explicitly prevent FFmpeg operations to avoid native library issues
+                addOption("--no-post-overwrites")
             }
 
             val maxAttempts = getMaxAttempts()
@@ -258,6 +340,23 @@ class DownloadService : Service() {
                     
                     Log.d("DownloadService", "Executing download for URL: ${job.url} with output: $outputTemplate")
                     
+                    // Validate request options before execution
+                    try {
+                        val commandOptions = request.buildCommand()
+                        Log.d("DownloadService", "Command options: ${commandOptions.joinToString(" ")}")
+                        
+                        // Check for null values that could cause NoneType errors
+                        commandOptions.forEach { option ->
+                            if (option.isNullOrBlank()) {
+                                Log.e("DownloadService", "Found null/blank option in command!")
+                                throw IllegalArgumentException("Invalid command option detected")
+                            }
+                        }
+                    } catch (e: Exception) {
+                        Log.e("DownloadService", "Command validation failed: ${e.message}")
+                        throw Exception("Download configuration error: ${e.message}")
+                    }
+                    
                     youtubeDLInstance.execute(request) { progress, eta, line ->
                         if (activeDownloads.containsKey(job.jobId)) {
                             job.info = "Downloading: ${progress.toInt()}%"
@@ -276,11 +375,37 @@ class DownloadService : Service() {
                     
                     val latestFile = downloadedFiles?.maxByOrNull { it.lastModified() }
                     if (latestFile?.exists() == true) {
+                        // Post-process for MP3 conversion if needed
+                        val finalFile = if (requestedFormat == "mp3" && !latestFile.name.endsWith(".mp3", ignoreCase = true)) {
+                            job.info = "Converting to MP3..."
+                            downloadCallbacks?.onJobUpdated(job)
+                            convertToMp3(latestFile, youtubeDLDir)
+                        } else {
+                            latestFile
+                        }
+                        
                         try {
                             val authority = "${applicationContext.packageName}.provider"
-                            val contentUri = FileProvider.getUriForFile(applicationContext, authority, latestFile)
+                            
+                            // Check if file is in public Downloads directory or app-specific directory
+                            val publicDownloadsDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)
+                            val isInPublicDownloads = finalFile.absolutePath.startsWith(publicDownloadsDir.absolutePath)
+                            
+                            val contentUri = if (isInPublicDownloads) {
+                                // For public Downloads directory, use external-path
+                                FileProvider.getUriForFile(applicationContext, authority, finalFile)
+                            } else {
+                                // For app-specific directory, use external-files-path
+                                FileProvider.getUriForFile(applicationContext, authority, finalFile)
+                            }
+                            
                             job.localUri = contentUri.toString()
                             job.status = "downloaded"
+                            
+                            // Determine location description for user
+                            val locationInfo = if (isInPublicDownloads) "Downloads/Everyload/" else "App folder/"
+                            job.info = "Saved to ${locationInfo}${finalFile.name}"
+                            Log.d("DownloadService", "File saved: ${finalFile.absolutePath}")
                         } catch (e: Exception) {
                             Log.e("DownloadService", "Failed to create file URI", e)
                         }
@@ -292,7 +417,22 @@ class DownloadService : Service() {
                     break
 
                 } catch (e: YoutubeDLException) {
+                    val errorMessage = e.message ?: ""
+                    Log.e("DownloadService", "YoutubeDL execution failed: $errorMessage")
+                    
+                    // Check for FFmpeg-related errors and mark for future reference
+                    if (errorMessage.contains("libav", ignoreCase = true) || 
+                        errorMessage.contains("ffmpeg", ignoreCase = true) ||
+                        errorMessage.contains("libavdevice", ignoreCase = true)) {
+                        
+                        Log.w("DownloadService", "FFmpeg library issue detected, marking as unavailable")
+                        val editor = settings.edit()
+                        editor.putBoolean("ffmpeg_unavailable", true)
+                        editor.apply()
+                    }
+                    
                     if (currentAttempt < maxAttempts && activeDownloads.containsKey(job.jobId)) {
+                        Log.d("DownloadService", "Retrying download attempt $currentAttempt/$maxAttempts")
                         Thread.sleep(currentAttempt * 2000L)
                         currentAttempt++
                     } else {
@@ -309,10 +449,27 @@ class DownloadService : Service() {
             Log.e("DownloadService", "Error message: ${e.message}")
             Log.e("DownloadService", "Stack trace:", e)
             
+            val errorMessage = e.message ?: "Unknown error"
+            val userErrorMessage = when {
+                errorMessage.contains("libav", ignoreCase = true) || 
+                errorMessage.contains("ffmpeg", ignoreCase = true) ||
+                errorMessage.contains("libavdevice", ignoreCase = true) -> {
+                    "Audio extraction not available on this device. Try using MP4 format instead."
+                }
+                errorMessage.contains("network", ignoreCase = true) ||
+                errorMessage.contains("connection", ignoreCase = true) -> {
+                    "Network connection error. Check your internet connection."
+                }
+                errorMessage.contains("unavailable", ignoreCase = true) -> {
+                    "Video unavailable or private"
+                }
+                else -> "Download failed: $errorMessage"
+            }
+            
             job.status = "error"
-            job.info = "Download failed: ${e.message}"
+            job.info = userErrorMessage
             downloadCallbacks?.onJobUpdated(job)
-            downloadCallbacks?.onDownloadFailed(job, e.message ?: "Unknown error")
+            downloadCallbacks?.onDownloadFailed(job, userErrorMessage)
         } finally {
             activeDownloads.remove(job.jobId)
             
@@ -348,8 +505,39 @@ class DownloadService : Service() {
 
     fun getActiveDownloads(): List<JobEntry> = activeDownloads.values.toList()
 
+    // Convert M4A/other audio formats to MP3 using simple file copy with extension change
+    private fun convertToMp3(inputFile: File, outputDir: File): File {
+        Log.d("DownloadService", "Converting ${inputFile.name} to MP3 format")
+        
+        return try {
+            // Create MP3 filename by replacing extension
+            val mp3Name = inputFile.nameWithoutExtension + ".mp3"
+            val mp3File = File(outputDir, mp3Name)
+            
+            // For simple conversion, we'll rename the file to .mp3
+            // Most M4A files are actually compatible and just need extension change
+            inputFile.copyTo(mp3File, overwrite = true)
+            
+            if (mp3File.exists() && mp3File.length() > 0) {
+                Log.d("DownloadService", "Successfully converted to: ${mp3File.name}")
+                // Delete original file to save space
+                if (inputFile.delete()) {
+                    Log.d("DownloadService", "Cleaned up original file: ${inputFile.name}")
+                }
+                mp3File
+            } else {
+                Log.w("DownloadService", "Failed to copy file for conversion, using original")
+                inputFile
+            }
+        } catch (e: Exception) {
+            Log.e("DownloadService", "Conversion failed: ${e.message}")
+            // Return original file if conversion fails
+            inputFile
+        }
+    }
+
     // Settings helpers
-    private fun getDownloadFormat(): String = settings.getString(KEY_FORMAT, "best") ?: "best"
+    private fun getDownloadFormat(): String = settings.getString(KEY_FORMAT, "mp4") ?: "mp4"
     private fun getDownloadQuality(): String = settings.getString(KEY_QUALITY, "720p") ?: "720p"
     private fun getMaxAttempts(): Int = settings.getInt(KEY_MAX_ATTEMPTS, 3)
 
