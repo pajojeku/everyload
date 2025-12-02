@@ -1049,8 +1049,8 @@ class MainActivity : AppCompatActivity(), DownloadService.DownloadServiceCallbac
                     put("jobId", job.jobId)
                     put("url", job.url)
                     put("status", job.status)
-                    put("info", job.info ?: "")
-                    put("title", job.title ?: "")
+                    if (!job.info.isNullOrEmpty()) put("info", job.info)
+                    if (!job.title.isNullOrEmpty()) put("title", job.title)
                     if (job.files != null) put("files", JSONArray(job.files!!))
                     if (job.localUri != null) put("localUri", job.localUri!!)
                     if (job.downloadId != null) put("downloadId", job.downloadId!!)
@@ -1081,10 +1081,10 @@ class MainActivity : AppCompatActivity(), DownloadService.DownloadServiceCallbac
                     jobId = json.getString("jobId"),
                     url = json.getString("url"),
                     status = json.getString("status"),
-                    info = json.optString("info", null),
-                    title = json.optString("title", null),
+                    info = json.optString("info", null).takeIf { !it.isNullOrEmpty() },
+                    title = json.optString("title", null).takeIf { !it.isNullOrEmpty() },
                     files = files,
-                    localUri = json.optString("localUri", null),
+                    localUri = json.optString("localUri", null).takeIf { !it.isNullOrEmpty() },
                     downloadId = if (json.has("downloadId")) json.getLong("downloadId") else null
                 )
                 jobs.add(job)

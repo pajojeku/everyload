@@ -48,23 +48,24 @@
         <com.google.android.material.textfield.TextInputLayout
             android:id="@+id/urlInputLayout"
             android:layout_width="0dp"
-            android:layout_height="wrap_content"
+            android:layout_height="56dp"
             android:layout_weight="1"
             android:layout_marginEnd="12dp"
-            style="@style/Widget.Material3.TextInputLayout.OutlinedBox"
-            app:boxCornerRadiusTopStart="12dp"
-            app:boxCornerRadiusTopEnd="12dp"
-            app:boxCornerRadiusBottomStart="12dp"
-            app:boxCornerRadiusBottomEnd="12dp"
-            app:hintEnabled="true"
-            android:hint="Wklej link do wideo...">
+            style="@style/Widget.Material3.TextInputLayout.OutlinedBox.Dense"
+            app:boxCornerRadiusTopStart="28dp"
+            app:boxCornerRadiusTopEnd="28dp"
+            app:boxCornerRadiusBottomStart="28dp"
+            app:boxCornerRadiusBottomEnd="28dp"
+            app:hintEnabled="false">
 
             <com.google.android.material.textfield.TextInputEditText
                 android:id="@+id/urlInput"
                 android:layout_width="match_parent"
-                android:layout_height="wrap_content"
+                android:layout_height="match_parent"
                 android:inputType="textUri"
-                android:maxLines="1" />
+                android:maxLines="1"
+                android:hint="Paste video link..."
+                android:textSize="14sp" />
 
         </com.google.android.material.textfield.TextInputLayout>
 
