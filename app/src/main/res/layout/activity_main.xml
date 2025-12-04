@@ -48,7 +48,7 @@
         <com.google.android.material.textfield.TextInputLayout
             android:id="@+id/urlInputLayout"
             android:layout_width="0dp"
-            android:layout_height="56dp"
+            android:layout_height="46dp"
             android:layout_weight="1"
             android:layout_marginEnd="12dp"
             style="@style/Widget.Material3.TextInputLayout.OutlinedBox.Dense"
@@ -56,7 +56,8 @@
             app:boxCornerRadiusTopEnd="28dp"
             app:boxCornerRadiusBottomStart="28dp"
             app:boxCornerRadiusBottomEnd="28dp"
-            app:hintEnabled="false">
+            app:hintEnabled="false"
+            app:boxCollapsedPaddingTop="0dp">
 
             <com.google.android.material.textfield.TextInputEditText
                 android:id="@+id/urlInput"
@@ -64,21 +65,29 @@
                 android:layout_height="match_parent"
                 android:inputType="textUri"
                 android:maxLines="1"
+                android:singleLine="true"
                 android:hint="@string/hint_paste_link"
-                android:textSize="14sp" />
+                android:textSize="14sp"
+                android:gravity="center_vertical"
+                android:paddingTop="0dp"
+                android:paddingBottom="0dp"
+                android:minHeight="0dp" />
 
         </com.google.android.material.textfield.TextInputLayout>
 
         <com.google.android.material.button.MaterialButton
             android:id="@+id/downloadButton"
             android:layout_width="wrap_content"
-            android:layout_height="56dp"
+            android:layout_height="46dp"
             android:text="@string/btn_download"
             android:textAllCaps="false"
+            android:minHeight="46dp"
             app:cornerRadius="28dp"
             app:icon="@drawable/ic_download"
             app:iconGravity="textStart"
-            app:iconPadding="8dp" />
+            app:iconPadding="8dp"
+            android:insetTop="0dp"
+            android:insetBottom="0dp" />
 
     </LinearLayout>
 
