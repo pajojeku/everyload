@@ -7,15 +7,24 @@ import android.view.ViewGroup
 import android.widget.ProgressBar
 import android.widget.TextView
 import androidx.core.content.ContextCompat
+import androidx.recyclerview.widget.DiffUtil
 import androidx.recyclerview.widget.RecyclerView
 import com.elteam.everyload.R
 import com.elteam.everyload.model.JobEntry
 
+/**
+ * Adapter for displaying download jobs.
+ * Now uses stable IDs and DiffUtil for efficient updates.
+ */
 class JobAdapter(
-    private val items: MutableList<JobEntry>,
-    private val onClick: (JobEntry) -> Unit,
-    private val onChanged: () -> Unit = {}
+    private val onClick: (JobEntry) -> Unit
 ) : RecyclerView.Adapter<JobAdapter.VH>() {
+
+    private val items = mutableListOf<JobEntry>()
+    
+    init {
+        setHasStableIds(true)
+    }
 
     inner class VH(view: View) : RecyclerView.ViewHolder(view) {
         val title: TextView = view.findViewById(R.id.jobTitle)
@@ -33,9 +42,9 @@ class JobAdapter(
     override fun onBindViewHolder(holder: VH, position: Int) {
         val item = items[position]
         
-        // Show video title if available, otherwise show filename or jobId
-        holder.title.text = item.title ?: item.files?.firstOrNull() ?: item.jobId
-        holder.url.text = item.localUri ?: item.url
+        // Use the new display methods
+        holder.title.text = item.getDisplayTitle()
+        holder.url.text = item.getDisplayUrl()
         
         val context = holder.itemView.context
         
@@ -108,16 +117,94 @@ class JobAdapter(
     }
 
     override fun getItemCount(): Int = items.size
+    
+    override fun getItemId(position: Int): Long {
+        // Use jobId hash as stable ID
+        return items[position].jobId.hashCode().toLong()
+    }
 
-    fun upsert(job: JobEntry) {
-        val idx = items.indexOfFirst { it.jobId == job.jobId }
-        if (idx >= 0) {
-            items[idx] = job
-            notifyItemChanged(idx)
-        } else {
-            items.add(0, job)
-            notifyItemInserted(0)
+    /**
+     * Update the entire list using DiffUtil for efficient animations
+     */
+    fun submitList(newList: List<JobEntry>) {
+        val diffCallback = JobDiffCallback(items, newList)
+        val diffResult = DiffUtil.calculateDiff(diffCallback)
+        
+        items.clear()
+        items.addAll(newList)
+        diffResult.dispatchUpdatesTo(this)
+    }
+    
+    /**
+     * Update a single item by position
+     */
+    fun updateItem(position: Int, job: JobEntry) {
+        if (position in items.indices) {
+            items[position] = job
+            notifyItemChanged(position)
         }
-        onChanged()
+    }
+    
+    /**
+     * Insert a single item at position
+     */
+    fun insertItem(position: Int, job: JobEntry) {
+        items.add(position, job)
+        notifyItemInserted(position)
+    }
+    
+    /**
+     * Remove item at position
+     */
+    fun removeItem(position: Int) {
+        if (position in items.indices) {
+            items.removeAt(position)
+            notifyItemRemoved(position)
+        }
+    }
+    
+    /**
+     * Clear all items
+     */
+    fun clearAll() {
+        val size = items.size
+        items.clear()
+        notifyItemRangeRemoved(0, size)
+    }
+    
+    /**
+     * Get item at position
+     */
+    fun getItem(position: Int): JobEntry? {
+        return items.getOrNull(position)
     }
 }
+
+/**
+ * DiffUtil callback for efficient list updates
+ */
+private class JobDiffCallback(
+    private val oldList: List<JobEntry>,
+    private val newList: List<JobEntry>
+) : DiffUtil.Callback() {
+    
+    override fun getOldListSize(): Int = oldList.size
+    
+    override fun getNewListSize(): Int = newList.size
+    
+    override fun areItemsTheSame(oldItemPosition: Int, newItemPosition: Int): Boolean {
+        return oldList[oldItemPosition].jobId == newList[newItemPosition].jobId
+    }
+    
+    override fun areContentsTheSame(oldItemPosition: Int, newItemPosition: Int): Boolean {
+        val oldItem = oldList[oldItemPosition]
+        val newItem = newList[newItemPosition]
+        
+        return oldItem.status == newItem.status &&
+               oldItem.info == newItem.info &&
+               oldItem.title == newItem.title &&
+               oldItem.localUri == newItem.localUri &&
+               oldItem.files == newItem.files
+    }
+}
+

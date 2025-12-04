@@ -207,14 +207,17 @@ class DownloadService : Service() {
         
         Log.d("DownloadService", "Job validation passed - URL: ${job.url}, ID: ${job.jobId}")
         
+        // Track the current state of the job (since JobEntry is now immutable)
+        var currentJob = job
+        
         try {
             // First, extract video title if not already set
-            if (job.title.isNullOrEmpty()) {
-                job.info = "Fetching video info..."
-                downloadCallbacks?.onJobUpdated(job)
+            if (currentJob.title.isNullOrEmpty()) {
+                currentJob = currentJob.copy(info = "Fetching video info...")
+                downloadCallbacks?.onJobUpdated(currentJob)
                 
                 try {
-                    val infoRequest = YoutubeDLRequest(job.url).apply {
+                    val infoRequest = YoutubeDLRequest(currentJob.url).apply {
                         addOption("--no-playlist")
                         addOption("--print", "%(title)s")
                         addOption("--skip-download")
@@ -228,8 +231,8 @@ class DownloadService : Service() {
                     
                     val extractedTitle = result.out?.trim()
                     if (!extractedTitle.isNullOrEmpty() && extractedTitle != "NA" && !extractedTitle.startsWith("ERROR")) {
-                        job.title = extractedTitle
-                        Log.d("DownloadService", "Extracted title: ${job.title}")
+                        currentJob = currentJob.copy(title = extractedTitle)
+                        Log.d("DownloadService", "Extracted title: ${currentJob.title}")
                     }
                 } catch (e: Exception) {
                     Log.w("DownloadService", "Failed to extract title: ${e.message}")
@@ -238,9 +241,9 @@ class DownloadService : Service() {
             }
             
             // Update status
-            job.status = "downloading"
-            downloadCallbacks?.onJobUpdated(job)
-            updateNotification("Downloading", job.title ?: job.jobId, 0)
+            currentJob = currentJob.copy(status = "downloading")
+            downloadCallbacks?.onJobUpdated(currentJob)
+            updateNotification("Downloading", currentJob.title ?: currentJob.jobId, 0)
 
             // Create download directory in public Downloads folder
             val publicDownloadsDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)
@@ -275,10 +278,10 @@ class DownloadService : Service() {
             }
 
             // Create unique identifier from jobId (last 8 chars)
-            val uniqueId = job.jobId.takeLast(8)
+            val uniqueId = currentJob.jobId.takeLast(8)
             
             // Create safe filename from title - replace special characters with underscores
-            val safeTitle = job.title?.let { title ->
+            val safeTitle = currentJob.title?.let { title ->
                 val cleanTitle = title
                     .replace(Regex("[\\\\/:*?\"<>|]"), "_")  // Windows-incompatible chars
                     .replace(Regex("[\\s]+"), "_")           // Spaces to underscores
@@ -294,7 +297,7 @@ class DownloadService : Service() {
             Log.d("DownloadService", "Output template: $outputTemplate")
             
             // Validate URL and template before creating request
-            if (job.url.isNullOrBlank()) {
+            if (currentJob.url.isNullOrBlank()) {
                 throw Exception("Job URL is null or empty")
             }
             
@@ -302,14 +305,14 @@ class DownloadService : Service() {
                 throw Exception("Invalid output template: $outputTemplate")
             }
             
-            Log.d("DownloadService", "Creating YoutubeDL request for URL: ${job.url}")
+            Log.d("DownloadService", "Creating YoutubeDL request for URL: ${currentJob.url}")
 
             // Get requested format for use throughout the function
             val requestedFormat = getDownloadFormat()
             Log.d("DownloadService", "Requested format: $requestedFormat")
 
             // Create download request
-            val request = YoutubeDLRequest(job.url).apply {
+            val request = YoutubeDLRequest(currentJob.url).apply {
                 // Safe option adding function
                 fun safeAddOption(key: String, value: String?) {
                     if (value != null && value.isNotBlank()) {
@@ -330,7 +333,7 @@ class DownloadService : Service() {
                 addOption("--no-check-certificates")
                 
                 // Check if this is a YouTube URL
-                val isYouTube = job.url.contains("youtube.com") || job.url.contains("youtu.be")
+                val isYouTube = currentJob.url.contains("youtube.com") || currentJob.url.contains("youtu.be")
                 
                 if (isYouTube) {
                     // For YouTube, apply format and quality settings
@@ -338,7 +341,7 @@ class DownloadService : Service() {
                         "mp3" -> {
                             Log.d("DownloadService", "YouTube MP3 download")
                             safeAddOption("--format", "bestaudio[ext=mp3]/bestaudio[ext=m4a]/bestaudio/best")
-                            job.info = "Downloading audio (MP3 preferred)"
+                            currentJob = currentJob.copy(info = "Downloading audio (MP3 preferred)")
                         }
                         "mp4" -> {
                             val quality = getDownloadQuality()
@@ -366,7 +369,7 @@ class DownloadService : Service() {
                     // This mirrors the behavior of the Python server which works correctly
                     Log.d("DownloadService", "Non-YouTube site detected, using default yt-dlp format selection")
                     // No --format option - yt-dlp will pick the best available format automatically
-                    job.info = "Downloading..."
+                    currentJob = currentJob.copy(info = "Downloading...")
                 }
 
                 addOption("--extractor-retries", "3")
@@ -377,11 +380,11 @@ class DownloadService : Service() {
             val maxAttempts = getMaxAttempts()
             var currentAttempt = 1
 
-            while (currentAttempt <= maxAttempts && activeDownloads.containsKey(job.jobId)) {
+            while (currentAttempt <= maxAttempts && activeDownloads.containsKey(currentJob.jobId)) {
                 try {
-                    job.info = "Attempt $currentAttempt/$maxAttempts"
-                    downloadCallbacks?.onJobUpdated(job)
-                    updateNotification("Downloading", "${job.title ?: job.jobId} (Attempt $currentAttempt/$maxAttempts)", 0)
+                    currentJob = currentJob.copy(info = "Attempt $currentAttempt/$maxAttempts")
+                    downloadCallbacks?.onJobUpdated(currentJob)
+                    updateNotification("Downloading", "${currentJob.title ?: currentJob.jobId} (Attempt $currentAttempt/$maxAttempts)", 0)
 
                     val youtubeDLInstance = YoutubeDL.getInstance()
                     if (youtubeDLInstance == null) {
@@ -397,7 +400,7 @@ class DownloadService : Service() {
                         }
                     }
                     
-                    Log.d("DownloadService", "Executing download for URL: ${job.url} with output: $outputTemplate")
+                    Log.d("DownloadService", "Executing download for URL: ${currentJob.url} with output: $outputTemplate")
                     
                     // Validate request options before execution
                     try {
@@ -417,15 +420,15 @@ class DownloadService : Service() {
                     }
                     
                     youtubeDLInstance.execute(request) { progress, eta, line ->
-                        if (activeDownloads.containsKey(job.jobId)) {
-                            job.info = "Downloading: ${progress.toInt()}%"
-                            downloadCallbacks?.onJobUpdated(job)
-                            updateNotification("Downloading", job.title ?: job.jobId, progress.toInt())
+                        if (activeDownloads.containsKey(currentJob.jobId)) {
+                            currentJob = currentJob.copy(info = "Downloading: ${progress.toInt()}%")
+                            downloadCallbacks?.onJobUpdated(currentJob)
+                            updateNotification("Downloading", currentJob.title ?: currentJob.jobId, progress.toInt())
                         }
                     }
 
                     // Download completed successfully
-                    job.status = "finished"
+                    currentJob = currentJob.copy(status = "finished")
                     
                     // Find downloaded file by matching the expected filename (safeTitle contains unique ID)
                     Log.d("DownloadService", "Looking for file with prefix: $safeTitle")
@@ -447,8 +450,8 @@ class DownloadService : Service() {
                         
                         // Post-process for MP3 conversion if needed
                         val finalFile = if (requestedFormat == "mp3" && !latestFile.name.endsWith(".mp3", ignoreCase = true)) {
-                            job.info = "Converting to MP3..."
-                            downloadCallbacks?.onJobUpdated(job)
+                            currentJob = currentJob.copy(info = "Converting to MP3...")
+                            downloadCallbacks?.onJobUpdated(currentJob)
                             convertToMp3(latestFile, youtubeDLDir)
                         } else {
                             latestFile
@@ -469,21 +472,22 @@ class DownloadService : Service() {
                                 FileProvider.getUriForFile(applicationContext, authority, finalFile)
                             }
                             
-                            job.localUri = contentUri.toString()
-                            job.status = "downloaded"
-                            
                             // Determine location description for user
                             val locationInfo = if (isInPublicDownloads) "Downloads/Everyload/" else "App folder/"
-                            job.info = "Saved to ${locationInfo}${finalFile.name}"
+                            currentJob = currentJob.copy(
+                                localUri = contentUri.toString(),
+                                status = "downloaded",
+                                info = "Saved to ${locationInfo}${finalFile.name}"
+                            )
                             Log.d("DownloadService", "File saved: ${finalFile.absolutePath}")
                         } catch (e: Exception) {
                             Log.e("DownloadService", "Failed to create file URI", e)
                         }
                     }
 
-                    job.info = "Download completed"
-                    downloadCallbacks?.onJobUpdated(job)
-                    downloadCallbacks?.onDownloadCompleted(job)
+                    currentJob = currentJob.copy(info = "Download completed")
+                    downloadCallbacks?.onJobUpdated(currentJob)
+                    downloadCallbacks?.onDownloadCompleted(currentJob)
                     break
 
                 } catch (e: YoutubeDLException) {
@@ -512,9 +516,9 @@ class DownloadService : Service() {
             }
 
         } catch (e: Exception) {
-            Log.e("DownloadService", "Download failed for job ${job.jobId}")
-            Log.e("DownloadService", "Job URL: ${job.url}")
-            Log.e("DownloadService", "Job title: ${job.title}")
+            Log.e("DownloadService", "Download failed for job ${currentJob.jobId}")
+            Log.e("DownloadService", "Job URL: ${currentJob.url}")
+            Log.e("DownloadService", "Job title: ${currentJob.title}")
             Log.e("DownloadService", "Error type: ${e.javaClass.simpleName}")
             Log.e("DownloadService", "Error message: ${e.message}")
             Log.e("DownloadService", "Stack trace:", e)
@@ -536,12 +540,14 @@ class DownloadService : Service() {
                 else -> "Download failed: $errorMessage"
             }
             
-            job.status = "error"
-            job.info = userErrorMessage
-            downloadCallbacks?.onJobUpdated(job)
-            downloadCallbacks?.onDownloadFailed(job, userErrorMessage)
+            currentJob = currentJob.copy(
+                status = "error",
+                info = userErrorMessage
+            )
+            downloadCallbacks?.onJobUpdated(currentJob)
+            downloadCallbacks?.onDownloadFailed(currentJob, userErrorMessage)
         } finally {
-            activeDownloads.remove(job.jobId)
+            activeDownloads.remove(currentJob.jobId)
             
             // Update notification or stop foreground if no more downloads
             if (activeDownloads.isEmpty()) {

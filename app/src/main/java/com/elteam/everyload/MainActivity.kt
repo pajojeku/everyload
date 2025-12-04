@@ -19,6 +19,7 @@ import androidx.core.view.WindowInsetsCompat
 import org.json.JSONObject
 import com.elteam.everyload.model.JobEntry
 import com.elteam.everyload.ui.JobAdapter
+import com.elteam.everyload.data.JobsManager
 import java.io.File
 import androidx.core.content.FileProvider
 import android.webkit.MimeTypeMap
@@ -54,9 +55,9 @@ import com.yausername.youtubedl_android.YoutubeDLRequest
 import com.yausername.youtubedl_android.YoutubeDLException
 import com.yausername.ffmpeg.FFmpeg
 
-class MainActivity : AppCompatActivity(), DownloadService.DownloadServiceCallbacks {
+class MainActivity : AppCompatActivity(), DownloadService.DownloadServiceCallbacks, JobsManager.JobChangeListener {
 
-    private val jobs = mutableListOf<JobEntry>()
+    private lateinit var jobsManager: JobsManager
     private lateinit var adapter: JobAdapter
     private lateinit var settings: SharedPreferences
     
@@ -132,6 +133,10 @@ class MainActivity : AppCompatActivity(), DownloadService.DownloadServiceCallbac
 
         settings = getSharedPreferences("app_settings", MODE_PRIVATE)
         
+        // Initialize JobsManager
+        jobsManager = JobsManager(this)
+        jobsManager.addChangeListener(this)
+        
         // Initialize YoutubeDL with enhanced error handling
         try {
             // Ensure app data directory exists
@@ -152,8 +157,9 @@ class MainActivity : AppCompatActivity(), DownloadService.DownloadServiceCallbac
         val recyclerView: RecyclerView = findViewById(R.id.jobsRecycler)
         recyclerView.layoutManager = LinearLayoutManager(this)
 
-        adapter = JobAdapter(jobs, { job -> handleJobClick(job) }) { saveJobsToPrefs() }
+        adapter = JobAdapter { job -> handleJobClick(job) }
         recyclerView.adapter = adapter
+        adapter.submitList(jobsManager.getAllJobs())
         
         // Setup swipe-to-delete
         setupSwipeToDelete(recyclerView)
@@ -182,8 +188,6 @@ class MainActivity : AppCompatActivity(), DownloadService.DownloadServiceCallbac
             handleSendIntent(testIntent)
             true
         }
-
-        loadJobsFromPrefs()
         
         // Process sharing intent if it's actually a sharing intent
         Log.d("MainActivity", "Checking intent for sharing: action=${originalIntent?.action}")
@@ -445,10 +449,9 @@ class MainActivity : AppCompatActivity(), DownloadService.DownloadServiceCallbac
             extractPlaylistInfo(trimmedUrl)
         } else {
             // Single video download
-            val jobId = "ytdlp_${System.currentTimeMillis()}"
+            val jobId = jobsManager.generateJobId("ytdlp")
             val entry = JobEntry(jobId = jobId, url = trimmedUrl, status = "queued")
-            jobs.add(0, entry)
-            adapter.upsert(entry)
+            jobsManager.addJob(entry)
             
             runOnUiThread {
                 Toast.makeText(this, getString(R.string.toast_added_to_queue), Toast.LENGTH_SHORT).show()
@@ -466,11 +469,14 @@ class MainActivity : AppCompatActivity(), DownloadService.DownloadServiceCallbac
     
     // Extract playlist information and create separate jobs for each video
     private fun extractPlaylistInfo(playlistUrl: String) {
-        val extractJobId = "extract_${System.currentTimeMillis()}"
-        val extractEntry = JobEntry(jobId = extractJobId, url = playlistUrl, status = "extracting")
-        extractEntry.info = getString(R.string.info_extracting_playlist)
-        jobs.add(0, extractEntry)
-        adapter.upsert(extractEntry)
+        val extractJobId = jobsManager.generateJobId("extract")
+        val extractEntry = JobEntry(
+            jobId = extractJobId,
+            url = playlistUrl,
+            status = "extracting",
+            info = getString(R.string.info_extracting_playlist)
+        )
+        jobsManager.addJob(extractEntry)
         
         Thread {
             try {
@@ -481,9 +487,10 @@ class MainActivity : AppCompatActivity(), DownloadService.DownloadServiceCallbac
                 
                 if (externalDir == null) {
                     runOnUiThread {
-                        extractEntry.status = "error"
-                        extractEntry.info = getString(R.string.error_cannot_access_directory)
-                        adapter.upsert(extractEntry)
+                        jobsManager.updateJob(extractEntry.copy(
+                            status = "error",
+                            info = getString(R.string.error_cannot_access_directory)
+                        ))
                         Toast.makeText(this@MainActivity, getString(R.string.error_cannot_access_directory), Toast.LENGTH_LONG).show()
                     }
                     return@Thread
@@ -494,9 +501,10 @@ class MainActivity : AppCompatActivity(), DownloadService.DownloadServiceCallbac
                 
                 if (!youtubeDLDir.exists() && !youtubeDLDir.mkdirs()) {
                     runOnUiThread {
-                        extractEntry.status = "error"
-                        extractEntry.info = getString(R.string.error_cannot_create_directory)
-                        adapter.upsert(extractEntry)
+                        jobsManager.updateJob(extractEntry.copy(
+                            status = "error",
+                            info = getString(R.string.error_cannot_create_directory)
+                        ))
                         Toast.makeText(this@MainActivity, getString(R.string.error_cannot_create_directory), Toast.LENGTH_LONG).show()
                     }
                     return@Thread
@@ -505,9 +513,10 @@ class MainActivity : AppCompatActivity(), DownloadService.DownloadServiceCallbac
                 // Validate directory access
                 if (!youtubeDLDir.isDirectory() || !youtubeDLDir.canWrite()) {
                     runOnUiThread {
-                        extractEntry.status = "error"
-                        extractEntry.info = getString(R.string.error_directory_not_writable)
-                        adapter.upsert(extractEntry)
+                        jobsManager.updateJob(extractEntry.copy(
+                            status = "error",
+                            info = getString(R.string.error_directory_not_writable)
+                        ))
                         Toast.makeText(this@MainActivity, getString(R.string.error_directory_not_writable), Toast.LENGTH_LONG).show()
                     }
                     return@Thread
@@ -521,17 +530,19 @@ class MainActivity : AppCompatActivity(), DownloadService.DownloadServiceCallbac
                 }
                 
                 runOnUiThread {
-                    extractEntry.info = getString(R.string.info_connecting_playlist)
-                    adapter.upsert(extractEntry)
+                    jobsManager.updateJob(extractEntry.copy(
+                        info = getString(R.string.info_connecting_playlist)
+                    ))
                 }
                 
                 val youtubeDLInstance = YoutubeDL.getInstance()
                 if (youtubeDLInstance == null) {
                     Log.e("MainActivity", "YoutubeDL instance is null for playlist extraction")
                     runOnUiThread {
-                        extractEntry.status = "error"
-                        extractEntry.info = getString(R.string.error_ytdlp_unavailable)
-                        adapter.upsert(extractEntry)
+                        jobsManager.updateJob(extractEntry.copy(
+                            status = "error",
+                            info = getString(R.string.error_ytdlp_unavailable)
+                        ))
                         Toast.makeText(this@MainActivity, getString(R.string.error_ytdlp_unavailable), Toast.LENGTH_LONG).show()
                     }
                     return@Thread
@@ -545,8 +556,9 @@ class MainActivity : AppCompatActivity(), DownloadService.DownloadServiceCallbac
                         output.appendLine(line)
                     }
                     runOnUiThread {
-                        extractEntry.info = getString(R.string.info_analyzing_playlist, progress.toInt())
-                        adapter.upsert(extractEntry)
+                        jobsManager.updateJob(extractEntry.copy(
+                            info = getString(R.string.info_analyzing_playlist, progress.toInt())
+                        ))
                     }
                 }
                 
@@ -555,8 +567,7 @@ class MainActivity : AppCompatActivity(), DownloadService.DownloadServiceCallbac
                 
                 runOnUiThread {
                     // Remove the extraction job
-                    jobs.remove(extractEntry)
-                    adapter.notifyDataSetChanged()
+                    jobsManager.removeJob(extractEntry.jobId)
                     
                     if (lines.isEmpty()) {
                         Toast.makeText(this@MainActivity, getString(R.string.toast_no_videos_in_playlist), Toast.LENGTH_LONG).show()
@@ -574,17 +585,16 @@ class MainActivity : AppCompatActivity(), DownloadService.DownloadServiceCallbac
                             val videoId = parts[1].trim()
                             val videoUrl = parts[2].trim()
                             
-                            val jobId = "ytdlp_${System.currentTimeMillis()}_$index"
+                            val jobId = jobsManager.generateJobId("ytdlp")
                             val videoEntry = JobEntry(
                                 jobId = jobId, 
                                 url = videoUrl.ifEmpty { "https://www.youtube.com/watch?v=$videoId" },
                                 status = "queued",
-                                title = title.ifEmpty { "Video ${index + 1}" }
+                                title = title.ifEmpty { "Video ${index + 1}" },
+                                info = getString(R.string.info_queued_position, index + 1, lines.size)
                             )
-                            videoEntry.info = getString(R.string.info_queued_position, index + 1, lines.size)
                             
-                            jobs.add(0, videoEntry)
-                            adapter.upsert(videoEntry)
+                            jobsManager.addJob(videoEntry)
                             
                             // Add to download queue for concurrent processing
                             synchronized(downloadQueue) {
@@ -603,9 +613,10 @@ class MainActivity : AppCompatActivity(), DownloadService.DownloadServiceCallbac
                 Log.e("MainActivity", "Error message: ${e.message}")
                 Log.e("MainActivity", "Stack trace:", e)
                 runOnUiThread {
-                    extractEntry.status = "error"
-                    extractEntry.info = getString(R.string.error_playlist_extraction, e.message ?: "")
-                    adapter.upsert(extractEntry)
+                    jobsManager.updateJob(extractEntry.copy(
+                        status = "error",
+                        info = getString(R.string.error_playlist_extraction, e.message ?: "")
+                    ))
                     Toast.makeText(this@MainActivity, getString(R.string.error_playlist_analysis, e.message ?: ""), Toast.LENGTH_LONG).show()
                 }
             }
@@ -649,9 +660,10 @@ class MainActivity : AppCompatActivity(), DownloadService.DownloadServiceCallbac
         if (!youtubeDLDir.exists()) {
             if (!youtubeDLDir.mkdirs()) {
                 runOnUiThread {
-                    entry.status = "error"
-                    entry.info = getString(R.string.error_cannot_create_download_dir)
-                    adapter.upsert(entry)
+                    jobsManager.updateJob(entry.copy(
+                        status = "error",
+                        info = getString(R.string.error_cannot_create_download_dir)
+                    ))
                     Toast.makeText(this@MainActivity, getString(R.string.error_cannot_create_directory), Toast.LENGTH_LONG).show()
                 }
                 return
@@ -661,9 +673,10 @@ class MainActivity : AppCompatActivity(), DownloadService.DownloadServiceCallbac
         // Validate download directory
         if (!youtubeDLDir.exists() || !youtubeDLDir.isDirectory()) {
             runOnUiThread {
-                entry.status = "error"
-                entry.info = getString(R.string.error_directory_not_accessible)
-                adapter.upsert(entry)
+                jobsManager.updateJob(entry.copy(
+                    status = "error",
+                    info = getString(R.string.error_directory_not_accessible)
+                ))
                 Toast.makeText(this@MainActivity, getString(R.string.error_cannot_access_download_dir), Toast.LENGTH_LONG).show()
             }
             return
@@ -721,8 +734,7 @@ class MainActivity : AppCompatActivity(), DownloadService.DownloadServiceCallbac
         
         // Update status to downloading
         runOnUiThread {
-            entry.status = "downloading"
-            adapter.upsert(entry)
+            jobsManager.updateJobStatus(entry.jobId, "downloading")
         }
         
         // Execute download in background thread with automatic retries
@@ -737,8 +749,8 @@ class MainActivity : AppCompatActivity(), DownloadService.DownloadServiceCallbac
                     
                     // Update status with attempt info
                     runOnUiThread {
-                        entry.info = getString(R.string.info_attempt_connecting, currentAttempt, maxAttempts)
-                        adapter.upsert(entry)
+                        jobsManager.updateJobStatus(entry.jobId, "downloading", 
+                            getString(R.string.info_attempt_connecting, currentAttempt, maxAttempts))
                     }
                     
                     val youtubeDLInstance = YoutubeDL.getInstance()
@@ -746,16 +758,13 @@ class MainActivity : AppCompatActivity(), DownloadService.DownloadServiceCallbac
                     youtubeDLInstance.execute(request) { progress, eta, line ->
                         Log.d("YouTubeDL", "$progress% (ETA $eta seconds) - $line")
                         runOnUiThread {
-                            entry.info = getString(R.string.info_attempt_downloading, currentAttempt, maxAttempts, progress.toInt())
-                            adapter.upsert(entry)
+                            jobsManager.updateJobStatus(entry.jobId, "downloading",
+                                getString(R.string.info_attempt_downloading, currentAttempt, maxAttempts, progress.toInt()))
                         }
                     }
                 
                     // Download completed successfully
                     runOnUiThread {
-                        entry.status = "finished"
-                        entry.info = getString(R.string.info_download_completed, currentAttempt, maxAttempts)
-                        
                         // Find the downloaded file by matching our unique filename
                         Log.d("YouTubeDL", "Looking for file with prefix: $safeTitle")
                         
@@ -778,30 +787,38 @@ class MainActivity : AppCompatActivity(), DownloadService.DownloadServiceCallbac
                             }?.maxByOrNull { it.lastModified() }
                         }
                         
+                        val currentJob = jobsManager.getJob(entry.jobId)
+                        if (currentJob == null) {
+                            Log.w("YouTubeDL", "Job ${entry.jobId} no longer exists")
+                            return@runOnUiThread
+                        }
+                        
                         if (downloadedFile != null && downloadedFile.exists()) {
                             try {
                                 // Use FileProvider for the downloaded file
                                 val authority = "${applicationContext.packageName}.provider"
                                 val contentUri = FileProvider.getUriForFile(applicationContext, authority, downloadedFile)
-                                entry.localUri = contentUri.toString()
-                                entry.status = "downloaded"
+                                jobsManager.updateJob(currentJob.copy(
+                                    status = "downloaded",
+                                    localUri = contentUri.toString(),
+                                    info = getString(R.string.info_download_completed, currentAttempt, maxAttempts)
+                                ))
                                 Log.d("YouTubeDL", "File downloaded successfully: ${downloadedFile.absolutePath}")
+                                Toast.makeText(this@MainActivity, getString(R.string.toast_downloaded, downloadedFile.name), Toast.LENGTH_LONG).show()
                             } catch (e: Exception) {
                                 Log.e("YouTubeDL", "Failed to create file URI", e)
-                                entry.status = "error"
-                                entry.info = getString(R.string.error_file_access, e.message ?: "")
+                                jobsManager.updateJob(currentJob.copy(
+                                    status = "error",
+                                    info = getString(R.string.error_file_access, e.message ?: "")
+                                ))
+                                Toast.makeText(this@MainActivity, getString(R.string.toast_download_error), Toast.LENGTH_LONG).show()
                             }
                         } else {
                             Log.w("YouTubeDL", "No files found in download directory")
-                            entry.status = "error"
-                            entry.info = getString(R.string.error_no_files_in_directory)
-                        }
-                        
-                        adapter.upsert(entry)
-                        val downloadedFileName = downloadedFile?.name ?: "file"
-                        if (entry.status == "downloaded") {
-                            Toast.makeText(this@MainActivity, getString(R.string.toast_downloaded, downloadedFileName), Toast.LENGTH_LONG).show()
-                        } else {
+                            jobsManager.updateJob(currentJob.copy(
+                                status = "error",
+                                info = getString(R.string.error_no_files_in_directory)
+                            ))
                             Toast.makeText(this@MainActivity, getString(R.string.toast_download_error), Toast.LENGTH_LONG).show()
                         }
                     }
@@ -817,8 +834,8 @@ class MainActivity : AppCompatActivity(), DownloadService.DownloadServiceCallbac
                         // Not the last attempt, show retry info
                         runOnUiThread {
                             val retryDelay = currentAttempt * 2 // Increasing delay: 2, 4, 6 seconds
-                            entry.info = getString(R.string.info_attempt_failed_retry, currentAttempt, retryDelay)
-                            adapter.upsert(entry)
+                            jobsManager.updateJobStatus(entry.jobId, "downloading",
+                                getString(R.string.info_attempt_failed_retry, currentAttempt, retryDelay))
                         }
                         
                         // Wait before retry
@@ -828,8 +845,6 @@ class MainActivity : AppCompatActivity(), DownloadService.DownloadServiceCallbac
                     } else {
                         // Last attempt failed, show final error
                         runOnUiThread {
-                            entry.status = "error"
-                            
                             // Parse common error messages
                             val userFriendlyError = when {
                                 errorMsg.contains("NoneType") || errorMsg.contains("Signature solving failed") || errorMsg.contains("challenge solving failed") -> 
@@ -846,8 +861,7 @@ class MainActivity : AppCompatActivity(), DownloadService.DownloadServiceCallbac
                                 else -> getString(R.string.error_download_failed, maxAttempts, errorMsg.take(100))
                             }
                             
-                            entry.info = userFriendlyError
-                            adapter.upsert(entry)
+                            jobsManager.updateJobStatus(entry.jobId, "error", userFriendlyError)
                             Toast.makeText(this@MainActivity, userFriendlyError, Toast.LENGTH_LONG).show()
                         }
                         break
@@ -857,17 +871,16 @@ class MainActivity : AppCompatActivity(), DownloadService.DownloadServiceCallbac
                     
                     if (currentAttempt < maxAttempts) {
                         runOnUiThread {
-                            entry.info = getString(R.string.info_unexpected_error_retry, currentAttempt)
-                            adapter.upsert(entry)
+                            jobsManager.updateJobStatus(entry.jobId, "downloading",
+                                getString(R.string.info_unexpected_error_retry, currentAttempt))
                         }
                         Thread.sleep(2000) // 2 second delay
                         currentAttempt++
                         continue
                     } else {
                         runOnUiThread {
-                            entry.status = "error"
-                            entry.info = getString(R.string.error_unexpected, maxAttempts, e.message ?: "")
-                            adapter.upsert(entry)
+                            jobsManager.updateJobStatus(entry.jobId, "error",
+                                getString(R.string.error_unexpected, maxAttempts, e.message ?: ""))
                             Toast.makeText(this@MainActivity, getString(R.string.error_unexpected_short, maxAttempts), Toast.LENGTH_LONG).show()
                         }
                         break
@@ -1006,13 +1019,13 @@ class MainActivity : AppCompatActivity(), DownloadService.DownloadServiceCallbac
     // DownloadService.DownloadServiceCallbacks implementation
     override fun onJobUpdated(job: JobEntry) {
         runOnUiThread {
-            adapter.upsert(job)
+            jobsManager.updateJob(job)
         }
     }
     
     override fun onDownloadCompleted(job: JobEntry) {
         runOnUiThread {
-            adapter.upsert(job)
+            jobsManager.updateJob(job)
             val fileName = job.localUri?.substringAfterLast("/") ?: "file"
             Toast.makeText(this, "Downloaded: $fileName", Toast.LENGTH_SHORT).show()
             
@@ -1026,7 +1039,7 @@ class MainActivity : AppCompatActivity(), DownloadService.DownloadServiceCallbac
 
     override fun onDownloadFailed(job: JobEntry, error: String) {
         runOnUiThread {
-            adapter.upsert(job)
+            jobsManager.updateJob(job)
             Toast.makeText(this, getString(R.string.toast_download_failed, job.title ?: job.jobId), Toast.LENGTH_SHORT).show()
             
             // Decrease active count and process queue
@@ -1046,8 +1059,8 @@ class MainActivity : AppCompatActivity(), DownloadService.DownloadServiceCallbac
                 activeDownloadCount++
                 
                 runOnUiThread {
-                    nextJob.info = getString(R.string.info_starting_download)
-                    adapter.upsert(nextJob)
+                    val updatedJob = nextJob.copy(info = getString(R.string.info_starting_download))
+                    jobsManager.updateJob(updatedJob)
                 }
                 
                 // Start download
@@ -1066,9 +1079,10 @@ class MainActivity : AppCompatActivity(), DownloadService.DownloadServiceCallbac
 
             override fun onSwiped(viewHolder: RecyclerView.ViewHolder, direction: Int) {
                 val position = viewHolder.adapterPosition
-                if (position < 0 || position >= jobs.size) return
+                val allJobs = jobsManager.getAllJobs()
+                if (position < 0 || position >= allJobs.size) return
                 
-                val job = jobs[position]
+                val job = allJobs[position]
                 
                 // Show confirmation dialog
                 AlertDialog.Builder(this@MainActivity)
@@ -1229,9 +1243,7 @@ class MainActivity : AppCompatActivity(), DownloadService.DownloadServiceCallbac
         }
         
         // Remove from list
-        jobs.removeAt(position)
-        adapter.notifyItemRemoved(position)
-        saveJobsToPrefs()
+        jobsManager.removeJob(job.jobId)
         
         Toast.makeText(this, getString(R.string.toast_deleted, job.title ?: job.jobId), Toast.LENGTH_SHORT).show()
     }
@@ -1274,72 +1286,15 @@ class MainActivity : AppCompatActivity(), DownloadService.DownloadServiceCallbac
         }
     }
 
-    private fun saveJobsToPrefs() {
-        val filteredJobs = jobs.filter { it.status != "downloading" || !it.info.isNullOrEmpty() && it.info!!.contains("%") }
-        
-        val prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
-        
-        try {
-            val jsonArray = JSONArray()
-            for (job in filteredJobs) {
-                val json = JSONObject().apply {
-                    put("jobId", job.jobId)
-                    put("url", job.url)
-                    put("status", job.status)
-                    if (!job.info.isNullOrEmpty()) put("info", job.info)
-                    if (!job.title.isNullOrEmpty()) put("title", job.title)
-                    if (job.files != null) put("files", JSONArray(job.files!!))
-                    if (job.localUri != null) put("localUri", job.localUri!!)
-                    if (job.downloadId != null) put("downloadId", job.downloadId!!)
-                }
-                jsonArray.put(json)
-            }
-            
-            prefs.edit().putString(KEY_JOBS, jsonArray.toString()).apply()
-        } catch (e: Exception) {
-            Log.e("MainActivity", "Failed to save jobs", e)
-        }
-    }
-
-    private fun loadJobsFromPrefs() {
-        val prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
-        val jobsJson = prefs.getString(KEY_JOBS, "[]") ?: "[]"
-        
-        try {
-            val jsonArray = JSONArray(jobsJson)
-            for (i in 0 until jsonArray.length()) {
-                val json = jsonArray.getJSONObject(i)
-                val files = if (json.has("files")) {
-                    val filesArray = json.getJSONArray("files")
-                    List(filesArray.length()) { idx -> filesArray.getString(idx) }
-                } else null
-                
-                val job = JobEntry(
-                    jobId = json.getString("jobId"),
-                    url = json.getString("url"),
-                    status = json.getString("status"),
-                    info = json.optString("info", null).takeIf { !it.isNullOrEmpty() },
-                    title = json.optString("title", null).takeIf { !it.isNullOrEmpty() },
-                    files = files,
-                    localUri = json.optString("localUri", null).takeIf { !it.isNullOrEmpty() },
-                    downloadId = if (json.has("downloadId")) json.getLong("downloadId") else null
-                )
-                jobs.add(job)
-            }
-            adapter.notifyDataSetChanged()
-        } catch (e: Exception) {
-            Log.e("MainActivity", "Failed to load jobs", e)
-        }
-    }
-
     private fun clearAllJobs() {
-        if (jobs.isNotEmpty()) {
+        val jobCount = jobsManager.getJobCount()
+        if (jobCount > 0) {
             AlertDialog.Builder(this)
                 .setTitle(getString(R.string.dialog_clear_list))
-                .setMessage(getString(R.string.dialog_clear_message, jobs.size))
+                .setMessage(getString(R.string.dialog_clear_message, jobCount))
                 .setPositiveButton(getString(R.string.btn_yes)) { _, _ ->
                     // Stop any active downloads first
-                    val activeJobs = jobs.filter { job ->
+                    val activeJobs = jobsManager.getAllJobs().filter { job ->
                         job.status == "downloading" || job.status == "queued" || job.status == "pending"
                     }
                     
@@ -1359,12 +1314,9 @@ class MainActivity : AppCompatActivity(), DownloadService.DownloadServiceCallbac
                         }
                     }
                     
-                    // Clear all jobs regardless of status
-                    val totalJobs = jobs.size
-                    jobs.clear()
-                    adapter.notifyDataSetChanged()
-                    saveJobsToPrefs()
-                    Toast.makeText(this, getString(R.string.toast_deleted_all, totalJobs), Toast.LENGTH_SHORT).show()
+                    // Clear all jobs
+                    jobsManager.clearAllJobs()
+                    Toast.makeText(this, getString(R.string.toast_deleted_all, jobCount), Toast.LENGTH_SHORT).show()
                 }
                 .setNegativeButton(getString(R.string.btn_cancel), null)
                 .show()
@@ -1374,7 +1326,7 @@ class MainActivity : AppCompatActivity(), DownloadService.DownloadServiceCallbac
     }
     
     private fun stopAllDownloads() {
-        val activeJobs = jobs.filter { job ->
+        val activeJobs = jobsManager.getAllJobs().filter { job ->
             job.status == "downloading" || job.status == "queued" || job.status == "pending"
         }
         
@@ -1404,10 +1356,9 @@ class MainActivity : AppCompatActivity(), DownloadService.DownloadServiceCallbac
                     
                     // Update job statuses
                     activeJobs.forEach { job ->
-                        job.status = "stopped"
+                        val stoppedJob = job.copy(status = "stopped")
+                        jobsManager.updateJob(stoppedJob)
                     }
-                    adapter.notifyDataSetChanged()
-                    saveJobsToPrefs()
                     
                     Toast.makeText(this, getString(R.string.toast_stopped_jobs, activeJobs.size), Toast.LENGTH_SHORT).show()
                 }
@@ -1466,5 +1417,30 @@ class MainActivity : AppCompatActivity(), DownloadService.DownloadServiceCallbac
                 }
             }
         }.start()
+    }
+    
+    // JobsManager.JobChangeListener implementation
+    override fun onJobAdded(job: JobEntry, position: Int) {
+        runOnUiThread {
+            adapter.submitList(jobsManager.getAllJobs())
+        }
+    }
+    
+    override fun onJobUpdated(job: JobEntry, position: Int) {
+        runOnUiThread {
+            adapter.submitList(jobsManager.getAllJobs())
+        }
+    }
+    
+    override fun onJobRemoved(jobId: String, position: Int) {
+        runOnUiThread {
+            adapter.submitList(jobsManager.getAllJobs())
+        }
+    }
+    
+    override fun onAllJobsCleared() {
+        runOnUiThread {
+            adapter.submitList(emptyList())
+        }
     }
 }
