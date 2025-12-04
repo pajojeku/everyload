@@ -421,9 +421,10 @@ class DownloadService : Service() {
                     
                     youtubeDLInstance.execute(request) { progress, eta, line ->
                         if (activeDownloads.containsKey(currentJob.jobId)) {
-                            currentJob = currentJob.copy(info = "Downloading: ${progress.toInt()}%")
+                            val progressPercent = progress.toInt().coerceAtLeast(0)
+                            currentJob = currentJob.copy(info = "Downloading: $progressPercent%")
                             downloadCallbacks?.onJobUpdated(currentJob)
-                            updateNotification("Downloading", currentJob.title ?: currentJob.jobId, progress.toInt())
+                            updateNotification("Downloading", currentJob.title ?: currentJob.jobId, progressPercent)
                         }
                     }
 

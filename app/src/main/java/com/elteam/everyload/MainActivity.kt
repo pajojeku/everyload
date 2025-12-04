@@ -60,6 +60,7 @@ class MainActivity : AppCompatActivity(), DownloadService.DownloadServiceCallbac
     private lateinit var jobsManager: JobsManager
     private lateinit var adapter: JobAdapter
     private lateinit var settings: SharedPreferences
+    private lateinit var recyclerView: RecyclerView
     
     // Concurrent download management
     private var activeDownloadCount = 0
@@ -154,7 +155,7 @@ class MainActivity : AppCompatActivity(), DownloadService.DownloadServiceCallbac
             showErrorDialog("Failed to initialize YoutubeDL: ${e.message}")
         }
 
-        val recyclerView: RecyclerView = findViewById(R.id.jobsRecycler)
+        recyclerView = findViewById(R.id.jobsRecycler)
         recyclerView.layoutManager = LinearLayoutManager(this)
 
         adapter = JobAdapter { job -> handleJobClick(job) }
@@ -379,7 +380,7 @@ class MainActivity : AppCompatActivity(), DownloadService.DownloadServiceCallbac
         val permissionsNeeded = mutableListOf<String>()
         
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            // Android 13+
+            // Android 13+ - use granular media permissions
             if (ContextCompat.checkSelfPermission(this, Manifest.permission.READ_MEDIA_VIDEO) != PackageManager.PERMISSION_GRANTED) {
                 permissionsNeeded.add(Manifest.permission.READ_MEDIA_VIDEO)
             }
@@ -387,12 +388,15 @@ class MainActivity : AppCompatActivity(), DownloadService.DownloadServiceCallbac
                 permissionsNeeded.add(Manifest.permission.READ_MEDIA_AUDIO)
             }
         } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-            // Android 6-12
-            if (ContextCompat.checkSelfPermission(this, Manifest.permission.WRITE_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED) {
-                permissionsNeeded.add(Manifest.permission.WRITE_EXTERNAL_STORAGE)
-            }
+            // Android 6-12 - use legacy storage permissions
             if (ContextCompat.checkSelfPermission(this, Manifest.permission.READ_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED) {
                 permissionsNeeded.add(Manifest.permission.READ_EXTERNAL_STORAGE)
+            }
+            // WRITE_EXTERNAL_STORAGE is only needed for Android 10 and below
+            if (Build.VERSION.SDK_INT <= Build.VERSION_CODES.Q) {
+                if (ContextCompat.checkSelfPermission(this, Manifest.permission.WRITE_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED) {
+                    permissionsNeeded.add(Manifest.permission.WRITE_EXTERNAL_STORAGE)
+                }
             }
         }
         
@@ -421,11 +425,14 @@ class MainActivity : AppCompatActivity(), DownloadService.DownloadServiceCallbac
     }
     
     private fun requestNotificationPermission() {
+        // POST_NOTIFICATIONS permission is only available from Android 13 (API 33)
+        // Android 10 (API 29) doesn't need this permission
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             if (ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
                 ActivityCompat.requestPermissions(this, arrayOf(Manifest.permission.POST_NOTIFICATIONS), NOTIFICATION_PERMISSION_REQUEST_CODE)
             }
         }
+        // For Android 12 and below (including Android 10), notifications work without runtime permission
     }
 
     // Start download directly with ytdlp library
@@ -556,8 +563,9 @@ class MainActivity : AppCompatActivity(), DownloadService.DownloadServiceCallbac
                         output.appendLine(line)
                     }
                     runOnUiThread {
+                        val progressPercent = progress.toInt().coerceAtLeast(0)
                         jobsManager.updateJob(extractEntry.copy(
-                            info = getString(R.string.info_analyzing_playlist, progress.toInt())
+                            info = getString(R.string.info_analyzing_playlist, progressPercent)
                         ))
                     }
                 }
@@ -758,8 +766,9 @@ class MainActivity : AppCompatActivity(), DownloadService.DownloadServiceCallbac
                     youtubeDLInstance.execute(request) { progress, eta, line ->
                         Log.d("YouTubeDL", "$progress% (ETA $eta seconds) - $line")
                         runOnUiThread {
+                            val progressPercent = progress.toInt().coerceAtLeast(0)
                             jobsManager.updateJobStatus(entry.jobId, "downloading",
-                                getString(R.string.info_attempt_downloading, currentAttempt, maxAttempts, progress.toInt()))
+                                getString(R.string.info_attempt_downloading, currentAttempt, maxAttempts, progressPercent))
                         }
                     }
                 
@@ -1423,6 +1432,10 @@ class MainActivity : AppCompatActivity(), DownloadService.DownloadServiceCallbac
     override fun onJobAdded(job: JobEntry, position: Int) {
         runOnUiThread {
             adapter.submitList(jobsManager.getAllJobs())
+            // Scroll to the top when a new job is added (position 0)
+            if (position == 0) {
+                recyclerView.scrollToPosition(0)
+            }
         }
     }
     
