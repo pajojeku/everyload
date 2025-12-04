@@ -335,7 +335,30 @@ class DownloadService : Service() {
                 // Check if this is a YouTube URL
                 val isYouTube = currentJob.url.contains("youtube.com") || currentJob.url.contains("youtu.be")
                 
-                if (isYouTube) {
+                // Check if this is a Facebook URL
+                val isFacebook = currentJob.url.contains("facebook.com") || 
+                                 currentJob.url.contains("fb.watch") || 
+                                 currentJob.url.contains("fb.com")
+                
+                if (isFacebook) {
+                    // Facebook-specific handling to fix black video issue
+                    Log.d("DownloadService", "Facebook URL detected, applying special format options")
+                    
+                    when (requestedFormat) {
+                        "mp3" -> {
+                            // Audio only
+                            safeAddOption("--format", "bestaudio/best")
+                            currentJob = currentJob.copy(info = "Downloading audio from Facebook")
+                        }
+                        else -> {
+                            // For Facebook videos, explicitly request dash_sd_src format which has both video and audio
+                            // This fixes the "black video with only audio" issue
+                            safeAddOption("--format", "dash_sd_src_no_ratelimit/dash_sd_src/best")
+                            addOption("--http-chunk-size", "10M")
+                            currentJob = currentJob.copy(info = "Downloading from Facebook (with video+audio)")
+                        }
+                    }
+                } else if (isYouTube) {
                     // For YouTube, apply format and quality settings
                     when (requestedFormat) {
                         "mp3" -> {

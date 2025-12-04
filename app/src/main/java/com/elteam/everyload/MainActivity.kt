@@ -741,27 +741,50 @@ class MainActivity : AppCompatActivity(), DownloadService.DownloadServiceCallbac
             // Always download single video (no playlist)
             addOption("--no-playlist")
             
-            // Format selection based on user preference
-            when (getDownloadFormat()) {
-                "mp3" -> {
-                    addOption("--extract-audio")
-                    addOption("--audio-format", "mp3")
-                    addOption("--audio-quality", "0")
-                }
-                "mp4" -> {
-                    val quality = getDownloadQuality()
-                    if (quality == "best") {
-                        addOption("--format", "best[ext=mp4]")
-                    } else {
-                        addOption("--format", "mp4[height<=${quality.replace("p", "")}]/best[ext=mp4]")
+            // Check if this is a Facebook URL
+            val isFacebook = entry.url.contains("facebook.com") || 
+                             entry.url.contains("fb.watch") || 
+                             entry.url.contains("fb.com")
+            
+            // Format selection based on user preference and site
+            if (isFacebook) {
+                // Facebook-specific handling to fix black video issue
+                when (getDownloadFormat()) {
+                    "mp3" -> {
+                        addOption("--format", "bestaudio/best")
+                        addOption("--extract-audio")
+                        addOption("--audio-format", "mp3")
+                        addOption("--audio-quality", "0")
+                    }
+                    else -> {
+                        // Use dash_sd_src format which has both video and audio merged
+                        addOption("--format", "dash_sd_src_no_ratelimit/dash_sd_src/best")
+                        addOption("--http-chunk-size", "10M")
                     }
                 }
-                else -> { // "best"
-                    val quality = getDownloadQuality()
-                    if (quality == "best") {
-                        addOption("--format", "best")
-                    } else {
-                        addOption("--format", "best[height<=${quality.replace("p", "")}]")
+            } else {
+                // Standard format selection for other sites
+                when (getDownloadFormat()) {
+                    "mp3" -> {
+                        addOption("--extract-audio")
+                        addOption("--audio-format", "mp3")
+                        addOption("--audio-quality", "0")
+                    }
+                    "mp4" -> {
+                        val quality = getDownloadQuality()
+                        if (quality == "best") {
+                            addOption("--format", "best[ext=mp4]")
+                        } else {
+                            addOption("--format", "mp4[height<=${quality.replace("p", "")}]/best[ext=mp4]")
+                        }
+                    }
+                    else -> { // "best"
+                        val quality = getDownloadQuality()
+                        if (quality == "best") {
+                            addOption("--format", "best")
+                        } else {
+                            addOption("--format", "best[height<=${quality.replace("p", "")}]")
+                        }
                     }
                 }
             }
