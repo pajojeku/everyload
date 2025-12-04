@@ -55,12 +55,26 @@ import com.yausername.youtubedl_android.YoutubeDLRequest
 import com.yausername.youtubedl_android.YoutubeDLException
 import com.yausername.ffmpeg.FFmpeg
 
-class MainActivity : AppCompatActivity(), DownloadService.DownloadServiceCallbacks, JobsManager.JobChangeListener {
+// Sensor imports for shake detection
+import android.hardware.Sensor
+import android.hardware.SensorEvent
+import android.hardware.SensorEventListener
+import android.hardware.SensorManager
+import kotlin.math.sqrt
+
+class MainActivity : AppCompatActivity(), DownloadService.DownloadServiceCallbacks, JobsManager.JobChangeListener, SensorEventListener {
 
     private lateinit var jobsManager: JobsManager
     private lateinit var adapter: JobAdapter
     private lateinit var settings: SharedPreferences
     private lateinit var recyclerView: RecyclerView
+    
+    // Shake detection
+    private var sensorManager: SensorManager? = null
+    private var accelerometer: Sensor? = null
+    private var lastShakeTime: Long = 0
+    private val SHAKE_THRESHOLD = 15f
+    private val SHAKE_COOLDOWN = 2000L // 2 seconds
     
     // Concurrent download management
     private var activeDownloadCount = 0
@@ -125,6 +139,10 @@ class MainActivity : AppCompatActivity(), DownloadService.DownloadServiceCallbac
         // Bind to download service
         val intent = Intent(this, DownloadService::class.java)
         bindService(intent, serviceConnection, Context.BIND_AUTO_CREATE)
+        
+        // Initialize shake detection
+        sensorManager = getSystemService(Context.SENSOR_SERVICE) as SensorManager
+        accelerometer = sensorManager?.getDefaultSensor(Sensor.TYPE_ACCELEROMETER)
         
         ViewCompat.setOnApplyWindowInsetsListener(findViewById(R.id.main)) { v, insets ->
             val systemBars = insets.getInsets(WindowInsetsCompat.Type.systemBars())
@@ -212,6 +230,20 @@ class MainActivity : AppCompatActivity(), DownloadService.DownloadServiceCallbac
         
         checkPermissions()
         requestNotificationPermission()
+    }
+    
+    override fun onResume() {
+        super.onResume()
+        // Register shake detection listener
+        accelerometer?.let {
+            sensorManager?.registerListener(this, it, SensorManager.SENSOR_DELAY_NORMAL)
+        }
+    }
+    
+    override fun onPause() {
+        super.onPause()
+        // Unregister shake detection listener to save battery
+        sensorManager?.unregisterListener(this)
     }
 
     override fun onDestroy() {
@@ -1455,5 +1487,36 @@ class MainActivity : AppCompatActivity(), DownloadService.DownloadServiceCallbac
         runOnUiThread {
             adapter.submitList(emptyList())
         }
+    }
+    
+    // SensorEventListener implementation for shake detection
+    override fun onSensorChanged(event: SensorEvent?) {
+        event?.let {
+            if (it.sensor.type == Sensor.TYPE_ACCELEROMETER) {
+                val x = it.values[0]
+                val y = it.values[1]
+                val z = it.values[2]
+                
+                // Calculate acceleration magnitude
+                val acceleration = sqrt((x * x + y * y + z * z).toDouble()).toFloat()
+                
+                // Detect shake
+                val currentTime = System.currentTimeMillis()
+                if (acceleration > SHAKE_THRESHOLD && (currentTime - lastShakeTime) > SHAKE_COOLDOWN) {
+                    lastShakeTime = currentTime
+                    onShakeDetected()
+                }
+            }
+        }
+    }
+    
+    override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) {
+        // Not needed for shake detection
+    }
+    
+    private fun onShakeDetected() {
+        // Open settings when shake is detected
+        Log.d("MainActivity", "Shake detected! Opening settings...")
+        showSettingsDialog()
     }
 }
