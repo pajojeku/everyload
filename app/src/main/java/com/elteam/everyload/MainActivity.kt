@@ -73,8 +73,11 @@ class MainActivity : AppCompatActivity(), DownloadService.DownloadServiceCallbac
     private var sensorManager: SensorManager? = null
     private var accelerometer: Sensor? = null
     private var lastShakeTime: Long = 0
-    private val SHAKE_THRESHOLD = 15f
-    private val SHAKE_COOLDOWN = 2000L // 2 seconds
+    private var shakeCount: Int = 0
+    private val SHAKE_THRESHOLD = 20f // Higher threshold - more force needed
+    private val SHAKE_COUNT_REQUIRED = 3 // Need 3 shakes
+    private val SHAKE_TIME_WINDOW = 1500L // Within 1.5 seconds
+    private val SHAKE_RESET_TIME = 3000L // Reset if no shake for 3 seconds
     
     // Concurrent download management
     private var activeDownloadCount = 0
@@ -1520,14 +1523,33 @@ class MainActivity : AppCompatActivity(), DownloadService.DownloadServiceCallbac
                 val y = it.values[1]
                 val z = it.values[2]
                 
-                // Calculate acceleration magnitude
-                val acceleration = sqrt((x * x + y * y + z * z).toDouble()).toFloat()
+                // Calculate acceleration magnitude (subtract gravity)
+                val gForce = sqrt((x * x + y * y + z * z).toDouble()).toFloat() - SensorManager.GRAVITY_EARTH
                 
-                // Detect shake
                 val currentTime = System.currentTimeMillis()
-                if (acceleration > SHAKE_THRESHOLD && (currentTime - lastShakeTime) > SHAKE_COOLDOWN) {
-                    lastShakeTime = currentTime
-                    onShakeDetected()
+                
+                // Reset shake count if too much time has passed
+                if (currentTime - lastShakeTime > SHAKE_RESET_TIME) {
+                    shakeCount = 0
+                }
+                
+                // Detect individual shake
+                if (gForce > SHAKE_THRESHOLD) {
+                    val timeSinceLastShake = currentTime - lastShakeTime
+                    
+                    // Only count if not too soon after last shake (debounce)
+                    if (timeSinceLastShake > 200) {
+                        shakeCount++
+                        lastShakeTime = currentTime
+                        
+                        Log.d("MainActivity", "Shake detected! Count: $shakeCount/$SHAKE_COUNT_REQUIRED")
+                        
+                        // Check if we have enough shakes within the time window
+                        if (shakeCount >= SHAKE_COUNT_REQUIRED) {
+                            shakeCount = 0 // Reset counter
+                            onShakeDetected()
+                        }
+                    }
                 }
             }
         }
