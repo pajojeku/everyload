@@ -55,6 +55,8 @@ dependencies {
     implementation("com.squareup.okhttp3:okhttp:4.11.0")
     // RecyclerView for jobs list
     implementation("androidx.recyclerview:recyclerview:1.3.0")
+    // Start.io SDK for ads
+    implementation("com.startapp:inapp-sdk:5.+")
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)

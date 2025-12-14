@@ -55,6 +55,9 @@ import com.yausername.youtubedl_android.YoutubeDLRequest
 import com.yausername.youtubedl_android.YoutubeDLException
 import com.yausername.ffmpeg.FFmpeg
 
+// Start.io imports
+import com.startapp.sdk.adsbase.StartAppSDK
+
 // Sensor imports for shake detection
 import android.hardware.Sensor
 import android.hardware.SensorEvent
@@ -154,6 +157,12 @@ class MainActivity : AppCompatActivity(), DownloadService.DownloadServiceCallbac
         }
 
         settings = getSharedPreferences("app_settings", MODE_PRIVATE)
+        
+        // Initialize Start.io SDK
+        StartAppSDK.initParams(applicationContext, "211883801")
+            .setReturnAdsEnabled(false)
+            .setCallback { Log.d("MainActivity", "Start.io SDK ready") }
+            .init()
         
         // Initialize JobsManager
         jobsManager = JobsManager(this)
