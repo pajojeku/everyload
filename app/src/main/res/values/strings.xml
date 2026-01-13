@@ -6,8 +6,9 @@
     <string name="btn_download">Download</string>
     <string name="section_downloads">Downloads</string>
     <string name="empty_state_title">No downloads</string>
-    <string name="empty_state_description">Paste a link or share a video\nfrom YouTube to start</string>
-    
+    <string name="empty_state_description">Paste a link or share a video\nto start</string>
+    <string name="empty_state_icon" translatable="false">📥</string>
+
     <!-- Status labels -->
     <string name="status_saved">Saved</string>
     <string name="status_downloading">Downloading…</string>
@@ -142,4 +143,5 @@
     <string name="toast_ytdlp_up_to_date">yt-dlp is already up to date (%s)</string>
     <string name="toast_ytdlp_update_failed">yt-dlp update failed: %s</string>
     <string name="dialog_link_not_valid">Received: %s\n\nThis doesn\'t appear to be a valid video URL.</string>
+    <string name="search_for_downloads">Search for downloaded videos...</string>
 </resources>

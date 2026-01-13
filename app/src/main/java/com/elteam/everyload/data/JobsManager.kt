@@ -284,19 +284,86 @@ class JobsManager(private val context: Context) {
         }
     }
     
+    /**
+     * Filter jobs by optional query (title/url/files), extensions and portal domains.
+     * All non-null filters are AND'ed together.
+     */
+    fun filterJobs(query: String? = null, extensions: List<String>? = null, domains: List<String>? = null): List<JobEntry> {
+        val q = query?.trim()?.lowercase()?.takeIf { it.isNotEmpty() }
+        val exts = extensions?.map { it.trim().lowercase().removePrefix(".") }?.filter { it.isNotEmpty() }?.toSet()
+        val domainSet = domains?.map { normalizeHost(it) }?.toSet()
+
+        return jobOrder.mapNotNull { jobsMap[it] }.filter { job ->
+            // Query filter - check title, url, files
+            val queryMatch = if (q == null) true else {
+                val titleMatch = job.title?.lowercase()?.contains(q) ?: false
+                val urlMatch = job.url.lowercase().contains(q)
+                val filesMatch = job.files?.any { it.lowercase().contains(q) } ?: false
+                titleMatch || urlMatch || filesMatch
+            }
+
+            if (!queryMatch) return@filter false
+
+            // Extensions filter
+            if (exts != null && exts.isNotEmpty()) {
+                val jobExts = mutableSetOf<String>()
+                job.files?.forEach { fn ->
+                    extractExtension(fn)?.let { jobExts.add(it) }
+                }
+                extractExtension(job.url)?.let { jobExts.add(it) }
+                job.localUri?.let { extractExtension(it)?.let { e -> jobExts.add(e) } }
+
+                if (jobExts.none { exts.contains(it) }) return@filter false
+            }
+
+            // Domain filter
+            if (domainSet != null && domainSet.isNotEmpty()) {
+                val host = extractHost(job.url)?.let { normalizeHost(it) }
+                if (host == null) return@filter false
+                if (domainSet.none { host.endsWith(it) || host == it }) return@filter false
+            }
+
+            true
+        }
+    }
+
+    private fun extractHost(url: String): String? {
+        return try {
+            val u = java.net.URI(url)
+            u.host
+        } catch (e: Exception) {
+            null
+        }
+    }
+
+    private fun normalizeHost(host: String): String {
+        var h = host.trim().lowercase()
+        if (h.startsWith("www.")) h = h.removePrefix("www.")
+        h = h.split("/")[0]
+        return h
+    }
+
+    private fun extractExtension(path: String?): String? {
+        if (path == null) return null
+        val p = path.substringAfterLast('/', path)
+        val lastDot = p.lastIndexOf('.')
+        if (lastDot < 0 || lastDot == p.length - 1) return null
+        return p.substring(lastDot + 1).lowercase()
+    }
+
     // Notification methods
     private fun notifyJobAdded(job: JobEntry, position: Int) {
         changeListeners.forEach { it.onJobAdded(job, position) }
     }
-    
+
     private fun notifyJobUpdated(job: JobEntry, position: Int) {
         changeListeners.forEach { it.onJobUpdated(job, position) }
     }
-    
+
     private fun notifyJobRemoved(jobId: String, position: Int) {
         changeListeners.forEach { it.onJobRemoved(jobId, position) }
     }
-    
+
     private fun notifyAllJobsCleared() {
         changeListeners.forEach { it.onAllJobsCleared() }
     }

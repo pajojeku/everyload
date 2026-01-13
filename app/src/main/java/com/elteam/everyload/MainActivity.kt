@@ -17,6 +17,7 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
 import org.json.JSONObject
+import com.elteam.everyload.data.DomainsManager
 import com.elteam.everyload.model.JobEntry
 import com.elteam.everyload.ui.JobAdapter
 import com.elteam.everyload.data.JobsManager
@@ -71,7 +72,8 @@ class MainActivity : AppCompatActivity(), DownloadService.DownloadServiceCallbac
     private lateinit var adapter: JobAdapter
     private lateinit var settings: SharedPreferences
     private lateinit var recyclerView: RecyclerView
-    
+    private lateinit var domainsManager: DomainsManager
+
     // Shake detection
     private var sensorManager: SensorManager? = null
     private var accelerometer: Sensor? = null
@@ -198,9 +200,42 @@ class MainActivity : AppCompatActivity(), DownloadService.DownloadServiceCallbac
         val urlInput: TextInputEditText = findViewById(R.id.urlInput)
         val downloadButton: com.google.android.material.button.MaterialButton = findViewById(R.id.downloadButton)
 
+        // Initialize DomainsManager and single search input
+        domainsManager = DomainsManager(this)
+        val searchInput: TextInputEditText = findViewById(R.id.searchInput)
+
+        // Simple debounce implementation (dynamic search)
+        var searchRunnable: Runnable? = null
+        val handler = android.os.Handler(mainLooper)
+        searchInput.addTextChangedListener(object : android.text.TextWatcher {
+            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
+            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {}
+            override fun afterTextChanged(s: android.text.Editable?) {
+                searchRunnable?.let { handler.removeCallbacks(it) }
+                searchRunnable = Runnable {
+                    // dynamic filter; user can type domain (domain.com) or extension (.mp4) or title
+                    applySearchFilter(s?.toString())
+                }
+                handler.postDelayed(searchRunnable!!, 250)
+            }
+        })
+
         downloadButton.setOnClickListener {
             val url = urlInput.text.toString().trim()
             if (url.isNotBlank()) {
+                // If URL contains a host, ensure it's saved in domains store
+                try {
+                    val host = java.net.URI(url).host?.lowercase()?.removePrefix("www.")
+                    host?.let { h ->
+                        if (domainsManager.findByDomain(h) == null) {
+                            val added = domainsManager.addDomain(name = h, domainsList = listOf(h))
+                            // Snackbar with undo
+                            com.google.android.material.snackbar.Snackbar.make(findViewById(R.id.main), "Zapisano nowy domain: ${h}", com.google.android.material.snackbar.Snackbar.LENGTH_LONG)
+                                .setAction("Cofnij") { domainsManager.removeDomainById(added.id) }
+                                .show()
+                        }
+                    }
+                } catch (_: Exception) {}
                 startYtdlpDownload(url)
                 urlInput.text?.clear()
             } else {
@@ -244,6 +279,30 @@ class MainActivity : AppCompatActivity(), DownloadService.DownloadServiceCallbac
         requestNotificationPermission()
     }
     
+    private fun applySearchFilter(query: String?) {
+         // Extract extensions (e.g. .mp4) from query and clean query text
+         var q = query?.trim()
+         val exts = mutableListOf<String>()
+         if (!q.isNullOrBlank()) {
+             val regex = Regex("\\.([A-Za-z0-9]{1,10})")
+             regex.findAll(q).forEach { match -> exts.add(match.groupValues[1].lowercase()) }
+             // remove extracted extensions from query to avoid affecting title search
+             q = q.replace(regex, " ").trim().takeIf { it.isNotEmpty() }
+         }
+
+         // If user typed a domain pattern (contains '.') try to use it as domain filter
+         val domainFilter = q?.takeIf { it.contains('.') }?.lowercase()?.removePrefix("www.")
+         val portalDomains = domainFilter?.let { listOf(it) }
+
+         val filtered = jobsManager.filterJobs(query = q, extensions = if (exts.isEmpty()) null else exts, domains = portalDomains)
+         runOnUiThread {
+             adapter.submitList(filtered)
+             // show/hide empty state
+             val emptyView = findViewById<View>(R.id.emptyStateView)
+             emptyView.visibility = if (filtered.isEmpty()) View.VISIBLE else View.GONE
+         }
+     }
+
     override fun onResume() {
         super.onResume()
         // Register shake detection listener

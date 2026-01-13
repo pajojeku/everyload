@@ -7,7 +7,7 @@
     <string name="btn_download">Pobierz</string>
     <string name="section_downloads">Pobrane</string>
     <string name="empty_state_title">Brak pobrań</string>
-    <string name="empty_state_description">Wklej link lub udostępnij wideo\nz YouTube, aby rozpocząć</string>
+    <string name="empty_state_description">Wklej link lub udostępnij wideo,  aby rozpocząć</string>
     
     <!-- Status labels -->
     <string name="status_saved">Zapisane</string>
@@ -143,4 +143,5 @@
     <string name="toast_ytdlp_up_to_date">yt-dlp jest już aktualne (%s)</string>
     <string name="toast_ytdlp_update_failed">Aktualizacja yt-dlp nieudana: %s</string>
     <string name="dialog_link_not_valid">Otrzymano: %s\n\nTo nie wygląda na prawidłowy link do wideo.</string>
+    <string name="search_for_downloads">Wyszukaj w pobranych...</string>
 </resources>

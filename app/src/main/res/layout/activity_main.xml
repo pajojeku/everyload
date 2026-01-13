@@ -91,6 +91,51 @@
 
     </LinearLayout>
 
+    <!-- New: Search Section (single search bar) -->
+    <LinearLayout
+        android:id="@+id/searchSection"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:layout_marginStart="16dp"
+        android:layout_marginEnd="16dp"
+        android:layout_marginTop="12dp"
+        android:gravity="center_vertical"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintTop_toBottomOf="@+id/inputSection">
+
+        <com.google.android.material.textfield.TextInputLayout
+            android:id="@+id/searchInputLayout"
+            android:layout_width="0dp"
+            android:layout_height="46dp"
+            android:layout_weight="1"
+            style="@style/Widget.Material3.TextInputLayout.OutlinedBox.Dense"
+            app:boxCornerRadiusTopStart="20dp"
+            app:boxCornerRadiusTopEnd="20dp"
+            app:boxCornerRadiusBottomStart="20dp"
+            app:boxCornerRadiusBottomEnd="20dp"
+            app:hintEnabled="false"
+            app:boxCollapsedPaddingTop="0dp">
+
+            <com.google.android.material.textfield.TextInputEditText
+                android:id="@+id/searchInput"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:inputType="text"
+                android:maxLines="1"
+                android:hint="@string/search_for_downloads"
+                android:singleLine="true"
+                android:textSize="14sp"
+                android:gravity="center_vertical"
+                android:paddingTop="0dp"
+                android:paddingBottom="0dp"
+                android:minHeight="0dp" />
+
+        </com.google.android.material.textfield.TextInputLayout>
+
+    </LinearLayout>
+
     <!-- Section header for downloads list -->
     <TextView
         android:id="@+id/sectionHeader"
@@ -105,7 +150,7 @@
         android:layout_marginStart="20dp"
         android:layout_marginTop="24dp"
         app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toBottomOf="@id/inputSection" />
+        app:layout_constraintTop_toBottomOf="@id/searchSection" />
 
     <!-- Subtle divider -->
     <View
@@ -171,7 +216,7 @@
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="📥"
+            android:text="@string/empty_state_icon"
             android:textSize="64sp"
             android:layout_marginBottom="20dp" />
 
