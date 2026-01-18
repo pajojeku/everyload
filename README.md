@@ -14,5 +14,8 @@ Everyload allows users to save videos from shared links on platforms like YouTub
 - 📱 **Android Share integration** — share links directly from a browser or other apps.  
 
 ---
+<p float="left">
+  <img src="https://github.com/user-attachments/assets/79902357-08ea-4cf4-9876-d3bfab6c37b1"" width="45%" />
+  <img src="https://github.com/user-attachments/assets/20e54a48-8427-4a48-ad7e-d8c2bcdad283" width="45%" />
+</p>
 
-<img width="298" height="607" alt="image" src="https://github.com/user-attachments/assets/79902357-08ea-4cf4-9876-d3bfab6c37b1" />
