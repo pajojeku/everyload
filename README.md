@@ -1,7 +1,5 @@
-<img width="192" height="192" alt="image" src="https://github.com/user-attachments/assets/208ca8ea-a46f-4ea1-bffa-3ce1a48ebfa5" />
-
 # Everyload
-
+<img width="192" height="192" alt="image" src="https://github.com/user-attachments/assets/208ca8ea-a46f-4ea1-bffa-3ce1a48ebfa5" />
 **Everyload** — Android application for downloading videos from various platforms using the *yt-dlp* library.
 
 Everyload allows users to save videos from shared links on platforms like YouTube, Twitter, Reddit, and more, leveraging the *yt-dlp* engine, a powerful media downloading tool.
